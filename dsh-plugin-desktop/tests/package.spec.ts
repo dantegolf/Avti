@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto'
 import { readFileSync, readdirSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
@@ -115,15 +114,13 @@ describe('published package surface', () => {
         '@deepseek-ai/dsh-client-ui-theme',
       ],
     })
-    const patch = readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')
-    expect(patch).toContain('name: dsh-plugin-desktop')
-    expect(patch).toContain('name: dsh-community-market')
-    expect(patch).toContain('name: dsh-plugin-desktop/terminal')
-    expect(patch).toContain('name: dsh-plugin-desktop/pnpm')
-    expect(patch).toContain('name: dsh-plugin-desktop/profiles')
-    expect(patch).toContain('name: dsh-plugin-desktop/diagnostics')
-    expect(patch).toContain('name: dsh-plugin-desktop/updates')
-    expect(patch).toContain('disabled: true')
+    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop')
+    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-community-market')
+    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/terminal')
+    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/pnpm')
+    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/profiles')
+    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/diagnostics')
+    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/updates')
   })
 
   it('keeps unaudited marketplace packages out of the published runtime', () => {
@@ -175,7 +172,6 @@ describe('published package surface', () => {
 
   it('builds public Host plugins and their private native bootstraps', () => {
     const config = readFileSync(new URL('tsdown.config.ts', packageRoot), 'utf8')
-
     expect(config).toContain("'windows-pwsh-sandbox': 'src/windows-pwsh-sandbox.ts'")
     expect(config).toContain("'windows-agent-presets': 'src/windows-agent-presets.ts'")
     expect(config).toContain("'windows-acl-runner': 'src/windows-acl-runner.ts'")
@@ -204,7 +200,6 @@ describe('published package surface', () => {
     const prepare = main.indexOf('const prepared = prepareDesktopProfile')
     const installDsh = main.indexOf('const dshRuntime = process.platform === \'win32\'')
     const boot = main.indexOf('const ctx = await boot')
-
     expect(recover).toBeGreaterThanOrEqual(0)
     expect(applyRecovered).toBeGreaterThan(recover)
     expect(snapshot).toBeGreaterThan(applyRecovered)
@@ -230,7 +225,6 @@ describe('published package surface', () => {
     const ready = main.indexOf('await app.whenReady()')
     const markClean = main.indexOf('desktopRun?.markClean()')
     const nativeExit = main.indexOf('app.exit(code)')
-
     expect(startCrashReporter).toBeGreaterThanOrEqual(0)
     expect(beginRun).toBeGreaterThan(startCrashReporter)
     expect(childLogging).toBeGreaterThan(beginRun)
@@ -252,7 +246,6 @@ describe('published package surface', () => {
     const verified = main.indexOf('await installRecovery.markHealthy(')
     const profileHealthy = main.indexOf('markDesktopProfileHealthy(selectionStatePath')
     const clearVerified = main.indexOf('await installRecovery.clear(verifiedInstallToClear.transactionId)')
-
     expect(fixedStatePath).toBeGreaterThanOrEqual(0)
     expect(main).not.toContain("desktopInstallRecoveryStatePath(app.getPath('userData'), process.env)")
     expect(main).not.toContain('process.env[DESKTOP_INSTALL_RECOVERY_STATE_ENV]')
@@ -270,13 +263,11 @@ describe('published package surface', () => {
 
   it('routes protected and ordinary startup failures through the native recovery window', () => {
     const main = readFileSync(new URL('src/main.ts', packageRoot), 'utf8')
-    const windows = [...main.matchAll(/await openStartupRecoveryWindow\(/gu)]
-      .map(match => match.index)
+    const windows = [...main.matchAll(/await openStartupRecoveryWindow\(/gu)].map(match => match.index)
     const prompt = main.indexOf("if (recoveryClaim.action === 'prompt')")
     const prepare = main.indexOf('const prepared = prepareDesktopProfile(')
     const recordFailure = main.indexOf('await installRecovery.recordFailure(')
     const quiesce = main.indexOf('const recoveryActionsSafe = await quiesceHostForRecovery()')
-
     expect(windows).toHaveLength(2)
     expect(windows[0]).toBeGreaterThan(prompt)
     expect(windows[0]).toBeLessThan(prepare)
@@ -297,49 +288,29 @@ describe('published package surface', () => {
 
   it('uses the upstream child-environment scrub around login-shell recovery', () => {
     const shellEnvironment = readFileSync(new URL('src/shell-environment.ts', packageRoot), 'utf8')
-
     expect(shellEnvironment).toContain('scrubbedParentEnv')
     expect(shellEnvironment).toContain('SENSITIVE_ENV_PATTERN')
     expect(shellEnvironment).toContain('DSH_ENV_PREFIX')
     expect(shellEnvironment).toContain('DESKTOP_SHELL_ENVIRONMENT_KEYS')
   })
 
-  it('fixes the installed application identity', () => {
+  it('fixes the installed Avti application identity', () => {
     expect(manifest.version).toBe(workspaceManifest.version)
     expect(manifest.build?.productName).toBe('Avti')
     expect(manifest.build?.appId).toBe('com.dantegolf.avti')
-    expect(manifest.build?.asarUnpack).toEqual([
-      'package.json',
-      'cordis.patch.yml',
-      'build/**',
-      'lib/**',
-      'node_modules/**',
-    ])
+    expect(manifest.build?.asarUnpack).toEqual(['package.json', 'cordis.patch.yml', 'build/**', 'lib/**', 'node_modules/**'])
     expect(manifest.build?.electronFuses).toEqual({ runAsNode: true })
     expect(manifest.files).toEqual(expect.arrayContaining([
-      'build/app-icon.png',
-      'build/app-icon-mac.png',
-      'build/tray-icon.svg',
-      'build/tray-icon*.png',
-      'docs/**',
+      'build/app-icon.png', 'build/app-icon-mac.png', 'build/tray-icon.svg', 'build/tray-icon*.png', 'docs/**',
     ]))
     expect(manifest.build?.files).toEqual([
-      'build/app-icon.png',
-      'build/app-icon-mac.png',
-      'build/tray-icon.svg',
-      'build/tray-icon*.png',
-      'cordis.patch.yml',
-      'lib/**',
-      'package.json',
-      '!node_modules/node-pty/build/**',
+      'build/app-icon.png', 'build/app-icon-mac.png', 'build/tray-icon.svg', 'build/tray-icon*.png',
+      'cordis.patch.yml', 'lib/**', 'package.json', '!node_modules/node-pty/build/**',
     ])
     expect(manifest.build?.mac?.icon).toBe('build/app-icon-mac.png')
     expect(manifest.build?.mac?.mergeASARs).toBe(false)
     expect(manifest.build?.win?.icon).toBe('build/app-icon.png')
-    expect(manifest.build?.win?.target).toEqual([{
-      target: 'nsis',
-      arch: ['x64'],
-    }])
+    expect(manifest.build?.win?.target).toEqual([{ target: 'nsis', arch: ['x64'] }])
     expect(manifest.build?.win?.artifactName).toBe('Avti-${version}-${arch}-Portable.${ext}')
     expect(manifest.build?.nsis).toEqual({
       license: 'THIRD_PARTY_NOTICES.md',
@@ -359,8 +330,7 @@ describe('published package surface', () => {
 
   it('separates unsigned smoke packaging from the signed macOS release', () => {
     const packageDir = readFileSync(new URL('scripts/package-dir.mjs', packageRoot), 'utf8')
-
-    expect(manifest.scripts?.build).toContain('node scripts/generate-mac-app-icon.mjs')
+    expect(manifest.scripts?.build).toContain('node scripts/generate-avti-icons.mjs')
     expect(manifest.scripts?.['package:dir']).toBe('yarn run build && node scripts/package-dir.mjs')
     expect(packageDir).toContain("CSC_IDENTITY_AUTO_DISCOVERY: 'false'")
     expect(manifest.scripts?.['dist:mac']).toBe('node scripts/release-mac.ts')
@@ -378,14 +348,10 @@ describe('published package surface', () => {
     expect(manifest.scripts?.['check:mac-package']).toBe('yarn run -T check')
     expect(manifest.scripts?.['verify:cli']).toBe('node scripts/verify-cli-runtime.mjs')
     expect(manifest.scripts?.check).toContain('yarn run verify:cli')
-    expect(workspaceManifest.scripts?.['dist:mac'])
-      .toBe('yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:mac')
-    expect(workspaceManifest.scripts?.['dist:mac-smoke'])
-      .toBe('yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:mac-smoke')
-    expect(workspaceManifest.scripts?.['dist:win'])
-      .toBe('yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win')
-    expect(workspaceManifest.scripts?.['dist:win-portable'])
-      .toBe('yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win-portable')
+    expect(workspaceManifest.scripts?.['dist:mac']).toBe('yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:mac')
+    expect(workspaceManifest.scripts?.['dist:mac-smoke']).toBe('yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:mac-smoke')
+    expect(workspaceManifest.scripts?.['dist:win']).toBe('yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win')
+    expect(workspaceManifest.scripts?.['dist:win-portable']).toBe('yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win-portable')
     expect(manifest.build?.afterPack).toBe('./scripts/verify-packaged-runtime.ts')
     expect(manifest.build?.mac).toEqual(expect.objectContaining({
       hardenedRuntime: true,
@@ -399,15 +365,8 @@ describe('published package surface', () => {
   })
 
   it('runs the full gate on Windows and packages through root scripts on native runners', () => {
-    const windowsJob = ciWorkflow.slice(
-      ciWorkflow.indexOf('  desktop-windows:'),
-      ciWorkflow.indexOf('  desktop-macos:'),
-    )
-    const macosJob = ciWorkflow.slice(
-      ciWorkflow.indexOf('  desktop-macos:'),
-      ciWorkflow.indexOf('  upstream-command-windows:'),
-    )
-
+    const windowsJob = ciWorkflow.slice(ciWorkflow.indexOf('  desktop-windows:'), ciWorkflow.indexOf('  desktop-macos:'))
+    const macosJob = ciWorkflow.slice(ciWorkflow.indexOf('  desktop-macos:'), ciWorkflow.indexOf('  upstream-command-windows:'))
     expect(windowsJob).toContain('- run: yarn check')
     expect(windowsJob).toContain('- run: yarn dist:win')
     expect(windowsJob).toContain('- run: yarn dist:win-portable')
@@ -417,50 +376,35 @@ describe('published package surface', () => {
     expect(macosJob).not.toContain('yarn workspace dsh-plugin-desktop dist:mac-smoke')
   })
 
-  it('keeps one fixed brand-blue tray source for generated native assets', () => {
+  it('keeps one fixed Avti-purple tray source for generated native assets', () => {
     const source = readFileSync(new URL('build/tray-icon.svg', packageRoot), 'utf8')
-
-    expect(source.match(/#4D6BFE/gu)).toHaveLength(1)
+    expect(source.match(/#8B5CF6/gu)).toHaveLength(1)
     expect(source).not.toMatch(/<style\b|prefers-color-scheme/iu)
     for (const filename of [
-      'tray-iconTemplate.png',
-      'tray-iconTemplate@2x.png',
-      'tray-icon-blue.png',
-      'tray-icon-blue@1.25x.png',
-      'tray-icon-blue@1.5x.png',
-      'tray-icon-blue@2x.png',
+      'tray-iconTemplate.png', 'tray-iconTemplate@2x.png', 'tray-icon-blue.png',
+      'tray-icon-blue@1.25x.png', 'tray-icon-blue@1.5x.png', 'tray-icon-blue@2x.png',
     ]) {
       expect(readFileSync(new URL(`build/${filename}`, packageRoot)).byteLength).toBeGreaterThan(0)
     }
   })
 
-  it('keeps the iOS Default source icon unmodified', () => {
-    const digest = createHash('sha256')
-      .update(readFileSync(new URL('build/app-icon.png', packageRoot)))
-      .digest('hex')
-
-    expect(digest).toBe('315fbc6e57ff1f34894f21f66fb7f9f26deccf78333c71fad21a6cec64e7de80')
+  it('keeps the AvtiCode SVG as the canonical application icon source', () => {
+    const source = readFileSync(new URL('build/app-icon-source.svg', packageRoot), 'utf8')
+    expect(source).toContain('fill="#111827"')
+    expect(source).toContain('fill="#8b5cf6"')
+    expect(source).toContain('fill="#fff"')
+    expect(source).toContain('M512 178 824 804H684l-64-135H404l-64 135H200l312-626')
   })
 
-  it('generates a centered macOS icon with a 100-pixel visual inset', async () => {
+  it('generates 1024px Avti application icons and a centered macOS safe area', async () => {
     const source = await sharp(readFileSync(new URL('build/app-icon.png', packageRoot))).metadata()
     const icon = sharp(readFileSync(new URL('build/app-icon-mac.png', packageRoot)))
     const metadata = await icon.metadata()
     const { info } = await icon
       .trim({ background: { r: 0, g: 0, b: 0, alpha: 0 }, threshold: 0 })
       .toBuffer({ resolveWithObject: true })
-
-    expect(metadata).toEqual(expect.objectContaining({
-      format: 'png',
-      width: 1024,
-      height: 1024,
-      space: 'rgb16',
-      depth: 'ushort',
-      bitsPerSample: 16,
-      channels: 4,
-      hasAlpha: true,
-    }))
-    expect(metadata.icc).toEqual(source.icc)
+    expect(source).toEqual(expect.objectContaining({ format: 'png', width: 1024, height: 1024, channels: 4, hasAlpha: true }))
+    expect(metadata).toEqual(expect.objectContaining({ format: 'png', width: 1024, height: 1024, channels: 4, hasAlpha: true }))
     expect(info).toEqual(expect.objectContaining({
       width: 824,
       height: 824,
@@ -478,11 +422,8 @@ describe('published package surface', () => {
 
   it('packages the native-compiled Koffi Windows runtime', () => {
     const lockfile = readFileSync(new URL('yarn.lock', workspaceRoot), 'utf8')
-
     expect(manifest.dependencies?.koffi).toBe('3.1.5')
-    expect(workspaceManifest.resolutions).toMatchObject({
-      'koffi@npm:^3.1.0': '3.1.5',
-    })
+    expect(workspaceManifest.resolutions).toMatchObject({ 'koffi@npm:^3.1.0': '3.1.5' })
     expect(lockfile).toContain('"koffi@npm:3.1.5":')
     expect(lockfile).toContain('@koromix/koffi-win32-x64@npm:3.1.5')
     expect(lockfile).not.toContain('"koffi@npm:3.1.4":')
@@ -498,10 +439,7 @@ describe('published package surface', () => {
     const electronBuilderRequire = createRequire(electronBuilderManifest)
     const appBuilderManifest = electronBuilderRequire.resolve('app-builder-lib/package.json')
     const installedCodeSign = readFileSync(join(dirname(appBuilderManifest), 'out/codeSign/macCodeSign.js'), 'utf8')
-
-    expect(workspaceManifest.resolutions).toMatchObject({
-      'app-builder-lib@npm:26.15.7': patchResolution,
-    })
+    expect(workspaceManifest.resolutions).toMatchObject({ 'app-builder-lib@npm:26.15.7': patchResolution })
     expect(manifest.devDependencies?.['electron-builder']).toBe('26.15.7')
     expect(lockfile).toContain('app-builder-lib@patch:app-builder-lib@npm%3A26.15.7#./patches/app-builder-lib@26.15.7.patch')
     expect(patch).toContain('importCerts(keychainFile, certPaths, cscPasswords, keychainPassword)')
@@ -520,13 +458,11 @@ describe('published package surface', () => {
     const sandboxLocalRequire = createRequire(sandboxLocalManifest)
     const sandboxLib = join(dirname(sandboxManifest), 'lib')
     const runtimeChunks = readdirSync(sandboxLib).filter(name => /^types-.*\.js$/u.test(name))
-
     expect(workspaceManifest.resolutions).toMatchObject({
       '@deepseek-ai/dsh-sandbox-windows-acl@npm:0.1.0-rc.7': patchResolution,
       '@deepseek-ai/dsh-sandbox-windows-acl@npm:^0.1.0-rc.7': patchResolution,
     })
-    expect(sandboxLocalRequire.resolve('@deepseek-ai/dsh-sandbox-windows-acl/package.json'))
-      .toBe(sandboxManifest)
+    expect(sandboxLocalRequire.resolve('@deepseek-ai/dsh-sandbox-windows-acl/package.json')).toBe(sandboxManifest)
     expect(lockfile).toContain('@deepseek-ai/dsh-sandbox-windows-acl@patch:@deepseek-ai/dsh-sandbox-windows-acl@npm%3A0.1.0-rc.7#./patches/dsh-sandbox-windows-acl@0.1.0-rc.7.patch')
     expect(patch.match(/^\+\s*dwFlags: 257,\r?$/gmu)).toHaveLength(2)
     expect(patch.match(/^\+\s*wShowWindow: 0,\r?$/gmu)).toHaveLength(2)

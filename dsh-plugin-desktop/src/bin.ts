@@ -1,4 +1,4 @@
-/** Headless-safe npm launcher for the DSH Desktop Electron executable. */
+/** Headless-safe npm launcher for the Avti Electron executable. */
 
 import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
@@ -7,13 +7,11 @@ import { posix, resolve, win32 } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { exportDesktopDiagnostics } from './diagnostic-export.ts'
 
-/** Parsed launcher action. */
 export type DesktopCliAction = 'export-diagnostics' | 'help' | 'version' | 'launch'
 
-/** Human-readable launcher help. */
 export const DESKTOP_CLI_HELP = `Usage: dsh-plugin-desktop [options]
 
-Launch DSH Desktop with the selected Web-capable profile.
+Launch Avti with the selected Web-capable profile.
 
 Options:
   --export-diagnostics  export logs and crash evidence without launching the app
@@ -21,11 +19,6 @@ Options:
   -V, --version         display version
 `
 
-/**
- * Parse the intentionally small npm-launcher argument set.
- * @param argv - arguments after the executable and script path.
- * @returns the requested action.
- */
 export function parseDesktopCli(argv: readonly string[]): DesktopCliAction {
   if (argv.length === 0) return 'launch'
   if (argv.length === 1 && argv[0] === '--export-diagnostics') return 'export-diagnostics'
@@ -34,14 +27,12 @@ export function parseDesktopCli(argv: readonly string[]): DesktopCliAction {
   throw new Error(`unknown arguments: ${argv.join(' ')}`)
 }
 
-/** Read the package version without importing Electron. */
 function packageVersion(): string {
   const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version?: unknown }
   if (typeof manifest.version !== 'string') throw new Error('package.json has no string version')
   return manifest.version
 }
 
-/** Resolve the Electron user-data location without importing Electron. */
 export function defaultDesktopUserDataDirectory(
   platform: NodeJS.Platform = process.platform,
   environment: NodeJS.ProcessEnv = process.env,
@@ -51,29 +42,25 @@ export function defaultDesktopUserDataDirectory(
   if (platform === 'win32') {
     const appData = environment.APPDATA
     if (appData === undefined || appData.length === 0) {
-      throw new Error('APPDATA is unavailable; cannot locate DSH Desktop diagnostics')
+      throw new Error('APPDATA is unavailable; cannot locate Avti diagnostics')
     }
-    return path.join(appData, 'DSH Desktop')
+    return path.join(appData, 'Avti')
   }
-  if (platform === 'darwin') return path.join(homeDirectory, 'Library', 'Application Support', 'DSH Desktop')
+  if (platform === 'darwin') return path.join(homeDirectory, 'Library', 'Application Support', 'Avti')
   const config = environment.XDG_CONFIG_HOME
-  return path.join(config === undefined || config.length === 0 ? path.join(homeDirectory, '.config') : config, 'DSH Desktop')
+  return path.join(config === undefined || config.length === 0 ? path.join(homeDirectory, '.config') : config, 'Avti')
 }
 
 export interface DesktopCliOptions {
-  /** Override used by focused tests and recovery tooling with a non-default data root. */
   readonly userDataDir?: string
 }
 
-/** Launch Electron and mirror its terminal exit status. */
 async function launchElectron(): Promise<number> {
   let electronPath: string
   try {
     const imported = await import('electron') as { default?: unknown }
     const candidate = imported.default
-    if (typeof candidate !== 'string') {
-      throw new Error('electron package did not provide its executable path')
-    }
+    if (typeof candidate !== 'string') throw new Error('electron package did not provide its executable path')
     electronPath = candidate
   } catch {
     process.stderr.write(
@@ -82,7 +69,7 @@ async function launchElectron(): Promise<number> {
       + '  npm install -g dsh-plugin-desktop\n'
       + 'Or add electron to the profile before launching:\n'
       + '  dsh plugin --profile <name> add electron\n'
-      + 'Or use the packaged DSH Desktop application.\n',
+      + 'Or use the packaged Avti application.\n',
     )
     return 1
   }
@@ -96,11 +83,6 @@ async function launchElectron(): Promise<number> {
   })
 }
 
-/**
- * Run the npm launcher.
- * @param argv - arguments after the executable and script path.
- * @returns process exit code.
- */
 export async function runDesktopCli(
   argv: readonly string[],
   options: DesktopCliOptions = {},
