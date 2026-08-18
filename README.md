@@ -8,7 +8,7 @@
   面向本地项目的桌面 AI 编程工作区：在一个应用里完成 Agent 对话、项目工具、终端与插件管理。
 </p>
 
-<p align="center"><strong>中文</strong> · <a href="README.en.md">English</a></p>
+<p align="center"><strong>中文</strong> · <a href="README.en.md">English</a> · <a href="README.ru.md">Русский</a></p>
 
 ## Avti 是什么
 
