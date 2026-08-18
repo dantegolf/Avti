@@ -9,6 +9,7 @@ import { applyAdvancedShell } from './advanced-shell.ts'
 import { startRendererBootReporter } from './boot-health.ts'
 import { installDesktopDirectoryPickerBridge } from './directory-picker.ts'
 import { parseDesktopClientEnvironment } from './environment.ts'
+import { installBrandingStyles } from './styles.ts'
 import { installWorkspaceFolderDrop } from './workspace-folder-drop.ts'
 
 export { applyAdvancedShell } from './advanced-shell.ts'
@@ -37,6 +38,10 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(
     () => startRendererBootReporter(ctx.loader),
     'dsh-plugin-desktop: renderer boot health report',
+  )
+  ctx.effect(
+    () => installBrandingStyles(),
+    'dsh-plugin-desktop: Avti branding',
   )
   ctx.effect(
     () => installWorkspaceFolderDrop({
