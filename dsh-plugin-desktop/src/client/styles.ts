@@ -7,6 +7,14 @@ import {
 } from '../window-chrome.ts'
 import { SIDEBAR_COLLAPSED } from './layout-state.ts'
 
+/** Exact Avti mark from assets/avti-logo.svg, embedded so the browser client bundle stays self-contained. */
+const AVTI_LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect x="7" y="7" width="498" height="498" rx="83" fill="#000"/><path fill="#fff" d="M220 107 215 113 164 234 92 393 98 397 156 397 164 393 255 188 258 188 286 252 337 259 341 262 339 264 246 272 214 344 318 295 339 288 340 291 313 317 313 320 345 393 354 397 413 397 417 395 417 387 393 334 301 111 290 105 226 105ZM448 58 436 53 429 55 378 161 379 164 396 167Z"/></svg>'
+const AVTI_LOGO_DATA_URI = `data:image/svg+xml,${encodeURIComponent(AVTI_LOGO_SVG)}`
+
+/** Stable geometry identifiers exposed by the unchanged upstream brand primitives. */
+const DEEPSEEK_WORDMARK_VIEWBOX = '0 0 182 24'
+const DEEPSEEK_FISH_VIEWBOX = '0 0 23.16 17.04'
+
 /** Advanced-shell stylesheet kept as a plain string so the package client bundle stays self-contained. */
 const ADVANCED_STYLES = `
 html, body, #root { width: 100%; height: 100%; }
@@ -31,6 +39,57 @@ body[data-dsh-desktop-mode="advanced"] { margin: 0; background: transparent !imp
 .dshDesktopFrame[data-desktop-platform="win32"] .dshDesktopDetailsSurface { grid-row: 2; }
 .dshDesktopWindowsCaptionRow { position: relative; grid-column: 2 / -1; grid-row: 1; min-width: 0; background: var(--dsw-alias-bg-base); }
 .dshDesktopWindowsCaptionRow::before { content: ""; position: absolute; inset: 0 ${WINDOWS_CAPTION_CONTROLS_WIDTH}px 0 0; user-select: none; -webkit-app-region: drag; }
+
+/* Avti owns the desktop branding while the official sidebar/conversation keep their behavior and state. */
+.dshDesktopUpstreamSidebar button:has(> svg[viewBox="${DEEPSEEK_WORDMARK_VIEWBOX}"]) > svg[viewBox="${DEEPSEEK_WORDMARK_VIEWBOX}"] { display: none; }
+.dshDesktopUpstreamSidebar button:has(> svg[viewBox="${DEEPSEEK_WORDMARK_VIEWBOX}"])::before {
+  content: "";
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin-right: 8px;
+  background: url("${AVTI_LOGO_DATA_URI}") center / contain no-repeat;
+}
+.dshDesktopUpstreamSidebar button:has(> svg[viewBox="${DEEPSEEK_WORDMARK_VIEWBOX}"])::after {
+  content: "Avti";
+  color: inherit;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 24px;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+/* Keep the compact rail branded too; hover still reveals the upstream expand affordance. */
+.dshDesktopFrame[data-sidebar-collapsed] .dshDesktopUpstreamSidebar button:has(> svg[viewBox="${DEEPSEEK_FISH_VIEWBOX}"]) > svg[viewBox="${DEEPSEEK_FISH_VIEWBOX}"] { display: none; }
+.dshDesktopFrame[data-sidebar-collapsed] .dshDesktopUpstreamSidebar button:has(> svg[viewBox="${DEEPSEEK_FISH_VIEWBOX}"])::before {
+  content: "";
+  width: 24px;
+  height: 24px;
+  background: url("${AVTI_LOGO_DATA_URI}") center / contain no-repeat;
+}
+.dshDesktopFrame[data-sidebar-collapsed] .dshDesktopUpstreamSidebar button:has(> svg[viewBox="${DEEPSEEK_FISH_VIEWBOX}"]):hover::before { display: none; }
+
+/* Replace only the blank-session hero headline; workspace/model/composer surfaces remain upstream-owned. */
+.dshDesktopConversationSurface div:has(> span > svg[viewBox="${DEEPSEEK_FISH_VIEWBOX}"]) {
+  grid-template-columns: 32px auto;
+}
+.dshDesktopConversationSurface div:has(> span > svg[viewBox="${DEEPSEEK_FISH_VIEWBOX}"]) > span { display: none; }
+.dshDesktopConversationSurface div:has(> span > svg[viewBox="${DEEPSEEK_FISH_VIEWBOX}"])::before {
+  content: "";
+  width: 32px;
+  height: 32px;
+  background: url("${AVTI_LOGO_DATA_URI}") center / contain no-repeat;
+}
+.dshDesktopConversationSurface div:has(> span > svg[viewBox="${DEEPSEEK_FISH_VIEWBOX}"])::after {
+  content: "Time to work!";
+  color: var(--dsw-alias-label-primary);
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 32px;
+  white-space: nowrap;
+}
+
 .dshDesktopFrame[data-sidebar-collapsed] { transition: grid-template-columns var(--ds-transition-duration-slow) var(--ds-ease-in-out); }
 .dshDesktopOverlay { position: absolute; z-index: 1000; inset: 0; pointer-events: none; }
 .dshDesktopOverlay > * { pointer-events: auto; }
