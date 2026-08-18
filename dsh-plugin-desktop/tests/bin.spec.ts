@@ -32,20 +32,20 @@ describe('desktop npm launcher', () => {
   })
 
   it('names the installed product and selected profile behavior', () => {
-    expect(DESKTOP_CLI_HELP).toContain('DSH Desktop')
+    expect(DESKTOP_CLI_HELP).toContain('Avti')
     expect(DESKTOP_CLI_HELP).toContain('selected Web-capable profile')
     expect(DESKTOP_CLI_HELP).toContain('--export-diagnostics')
   })
 
-  it('resolves the packaged Desktop user-data directory without Electron', () => {
+  it('resolves the packaged Avti user-data directory without Electron', () => {
     expect(defaultDesktopUserDataDirectory('win32', { APPDATA: 'C:\\Users\\Example\\AppData\\Roaming' }, 'ignored'))
-      .toBe('C:\\Users\\Example\\AppData\\Roaming\\DSH Desktop')
+      .toBe('C:\\Users\\Example\\AppData\\Roaming\\Avti')
     expect(defaultDesktopUserDataDirectory('darwin', {}, '/Users/example'))
-      .toBe('/Users/example/Library/Application Support/DSH Desktop')
+      .toBe('/Users/example/Library/Application Support/Avti')
   })
 
   it('exports diagnostics without launching Electron', async () => {
-    const userDataDir = mkdtempSync(join(tmpdir(), 'dsh-cli-diagnostics-'))
+    const userDataDir = mkdtempSync(join(tmpdir(), 'avti-cli-diagnostics-'))
     const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
     try {
       await expect(runDesktopCli(['--export-diagnostics'], { userDataDir })).resolves.toBe(0)
