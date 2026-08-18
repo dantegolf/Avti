@@ -5,35 +5,64 @@
 <h1 align="center">Avti</h1>
 
 <p align="center">
-  A desktop AI coding workspace for local projects: agent conversations, project tools, a terminal and plugin management in one app.
+  A desktop AI workspace for local projects.<br>
+  Agent, project tools, terminal and plugins in one app.
+</p>
+
+<p align="center">
+  <a href="https://github.com/dantegolf/Avti/releases/latest"><strong>Download for Windows</strong></a>
+  ·
+  <a href="#install-from-powershell">Install from PowerShell</a>
 </p>
 
 <p align="center"><a href="README.md">中文</a> · <strong>English</strong> · <a href="README.ru.md">Русский</a></p>
 
-## What is Avti?
+## Quick start
 
-Avti is an Electron desktop application built around the DeepSeek Harness runtime packages. This repository owns Avti's desktop shell, native OS integration, profiles, terminal and diagnostics services, and the built-in community plugin market.
+1. Install and open Avti.
+2. Choose a local project folder.
+3. Connect an AI provider and select a model.
+4. Create a new session and start working.
 
-The goal is simple: open a local project and keep the AI agent, project context, local tools and extensible plugins in one desktop workflow instead of requiring users to assemble several command-line services manually.
+Avti users do not need Node.js, Yarn, or a source checkout. Those are development requirements only.
 
-## What works today
+## Install on Windows
 
-- **Projects and workspaces**: create and switch workspaces, select local folders, drag folders into the desktop app, and use the native directory picker on Windows.
-- **Agent conversations and local tools**: use Harness sessions, tools, commands, attachments, code runtime, permissions and sandbox capabilities for project work.
-- **Desktop three-panel layout**: sidebar, conversation and details surfaces inside the native window; sidebar and details widths are resizable, with native title-bar handling for macOS and Windows.
-- **Local terminal**: the desktop runtime integrates terminal and shell services. The terminal plugin is currently disabled by default in the Linux composition.
-- **Profiles**: maintain and switch separate desktop/runtime configurations so plugin and project environments can be managed per profile.
-- **Built-in plugin market**: `dsh-community-market` is composed into the desktop app and provides plugin catalogs, details, sources, install/uninstall and management flows.
-- **Bundled pnpm / plugin installation services**: Avti can manage packages used by plugins and includes rollback/recovery logic for failed configuration changes.
-- **System tray and native desktop integration**: tray assets, native window behavior, platform adapters and the desktop startup lifecycle are implemented.
-- **Logs and diagnostics**: local logging, diagnostic export, renderer boot health, crash evidence and startup recovery are implemented in the repository.
-- **Packaging**: the repository includes Windows x64 NSIS installer and portable build flows, a macOS build flow, and a Linux directory target.
+### Standard installer
 
-## Current limitations
+Download the latest `Avti-*-x64-Setup.exe` from [Releases](https://github.com/dantegolf/Avti/releases/latest) and run it.
 
-Avti **does not yet have its own signed automatic-update channel**. The updater is intentionally disabled so Avti builds do not contact the upstream project's update service.
+The installer creates Avti shortcuts and installs for the current user. Windows builds are currently unsigned, so SmartScreen may display a warning until Authenticode signing is added.
 
-This repository also **does not ship or advertise a mobile remote-control feature**. This README lists only functionality that is present in the current codebase.
+### Install from PowerShell
+
+Install the latest release with one command:
+
+```powershell
+irm https://raw.githubusercontent.com/dantegolf/Avti/main/install.ps1 | iex
+```
+
+The terminal installer:
+
+- detects Windows x64;
+- resolves the latest GitHub Release;
+- downloads the ready-made Avti Setup package;
+- verifies the published SHA-256 checksum;
+- installs Avti silently;
+- launches the app when it is found in the standard install location.
+
+For diagnostics, download `install.ps1` and run it with `-Verbose`. Use `-Interactive` if you prefer the normal NSIS installer UI.
+
+## What Avti does
+
+- **Local projects** — workspaces, folder selection, drag-and-drop, and the native Windows directory picker.
+- **AI agent and project context** — sessions, attachments, commands, tools, code runtime, permissions, and sandbox capabilities.
+- **Pluggable models** — configure AI providers and models from the app.
+- **Desktop workspace** — sidebar, conversation, and details surfaces in a native window with system tray integration.
+- **Local terminal** — terminal and shell services next to the agent workflow.
+- **Profiles** — separate runtime, plugin, and environment configurations.
+- **Plugin Market** — a built-in community plugin catalog with install, uninstall, and management flows.
+- **Diagnostics** — local logs, boot health, crash evidence, diagnostic export, and recovery flows.
 
 ## Development
 
@@ -42,9 +71,10 @@ Requirements:
 - Node.js `^22.19.0` or `>=24.0.0`
 - Yarn `4.18.0`
 
-Install dependencies and start the development app:
-
 ```bash
+git clone https://github.com/dantegolf/Avti.git
+cd Avti
+corepack enable
 yarn install
 yarn dev
 ```
@@ -61,15 +91,22 @@ yarn dist:win-portable
 yarn dist:mac
 ```
 
+The Windows release pipeline lives in `.github/workflows/release-windows.yml`. A tag such as `v2.0.1` that matches the desktop package version builds the NSIS installer, generates `SHA256SUMS.txt`, and publishes both files to a GitHub Release.
+
 ## Repository layout
 
 - `dsh-plugin-desktop/` — Avti's Electron shell and desktop services
-- `dsh-community-market/` — plugin catalog, marketplace UI and install/uninstall flow
-- `dsh-community-fabric/` — plugin compatibility and contract work
-- `patches/` — compatibility patches for the pinned runtime dependencies
+- `dsh-community-market/` — plugin catalog, marketplace UI, and install/uninstall flow
+- `dsh-community-fabric/` — plugin compatibility and contracts
+- `patches/` — compatibility patches for pinned runtime dependencies
+- `install.ps1` — user-facing Windows bootstrap installer
 
-## Open-source components and attribution
+## Open source and attribution
 
-Avti uses DeepSeek Harness runtime packages and other open-source components, but Avti is the separate desktop product maintained in this repository and does not use the upstream DSH Desktop update channel.
+Avti uses DeepSeek Harness runtime packages and other open-source components. Those dependencies remain explicitly disclosed through licenses and third-party notices; the user-facing installation flow simply avoids requiring users to interact with package managers or build commands.
 
-See [`LICENSE`](LICENSE) for the project license and [`dsh-plugin-desktop/THIRD_PARTY_NOTICES.md`](dsh-plugin-desktop/THIRD_PARTY_NOTICES.md) for third-party notices used by the desktop package.
+See [`LICENSE`](LICENSE) for the project license and [`dsh-plugin-desktop/THIRD_PARTY_NOTICES.md`](dsh-plugin-desktop/THIRD_PARTY_NOTICES.md) for desktop third-party notices.
+
+## Current limitations
+
+Avti does not yet have its own signed automatic-update channel. The upstream DSH Desktop updater is disabled, and the Windows installer is currently published without Authenticode signing. Adding code signing to the release pipeline is the next production step for Windows distribution.

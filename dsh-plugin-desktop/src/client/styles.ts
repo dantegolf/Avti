@@ -7,6 +7,71 @@ import {
 } from '../window-chrome.ts'
 import { SIDEBAR_COLLAPSED } from './layout-state.ts'
 
+/** Exact Avti mark from assets/avti-logo.svg, embedded so the browser client bundle stays self-contained. */
+const AVTI_LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect x="7" y="7" width="498" height="498" rx="83" fill="#000"/><path fill="#fff" d="M220 107 215 113 164 234 92 393 98 397 156 397 164 393 255 188 258 188 286 252 337 259 341 262 339 264 246 272 214 344 318 295 339 288 340 291 313 317 313 320 345 393 354 397 413 397 417 395 417 387 393 334 301 111 290 105 226 105ZM448 58 436 53 429 55 378 161 379 164 396 167Z"/></svg>'
+const AVTI_LOGO_DATA_URI = `data:image/svg+xml,${encodeURIComponent(AVTI_LOGO_SVG)}`
+
+/** Stable geometry identifiers exposed by the unchanged upstream brand primitives. */
+const DEEPSEEK_WORDMARK_VIEWBOX = '0 0 182 24'
+const DEEPSEEK_FISH_VIEWBOX = '0 0 23.16 17.04'
+
+/**
+ * Branding is intentionally mode-independent: compatibility mode still renders
+ * the official sidebar/conversation components, so Avti must decorate those
+ * surfaces even when the desktop package does not own the root layout.
+ */
+const BRANDING_STYLES = `
+/* Expanded sidebar: replace the DeepSeek/HARNESS wordmark with Avti. */
+button:has(> svg[viewBox="${DEEPSEEK_WORDMARK_VIEWBOX}"]) > svg[viewBox="${DEEPSEEK_WORDMARK_VIEWBOX}"] { display: none; }
+button:has(> svg[viewBox="${DEEPSEEK_WORDMARK_VIEWBOX}"])::before {
+  content: "";
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin-right: 8px;
+  background: url("${AVTI_LOGO_DATA_URI}") center / contain no-repeat;
+}
+button:has(> svg[viewBox="${DEEPSEEK_WORDMARK_VIEWBOX}"])::after {
+  content: "Avti";
+  color: inherit;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 24px;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+/* Collapsed sidebar rail: replace only the resting fish; hover still reveals the panel toggle. */
+button:has(> svg[viewBox="${DEEPSEEK_FISH_VIEWBOX}"]) > svg[viewBox="${DEEPSEEK_FISH_VIEWBOX}"] { display: none; }
+button:has(> svg[viewBox="${DEEPSEEK_FISH_VIEWBOX}"])::before {
+  content: "";
+  width: 24px;
+  height: 24px;
+  background: url("${AVTI_LOGO_DATA_URI}") center / contain no-repeat;
+}
+button:has(> svg[viewBox="${DEEPSEEK_FISH_VIEWBOX}"]):hover::before { display: none; }
+
+/* Blank-session hero: replace fish + Into the Unknown + Preview with Avti + Time to work!. */
+div:has(> span > svg[viewBox="${DEEPSEEK_FISH_VIEWBOX}"]) {
+  grid-template-columns: 32px auto !important;
+}
+div:has(> span > svg[viewBox="${DEEPSEEK_FISH_VIEWBOX}"]) > span { display: none !important; }
+div:has(> span > svg[viewBox="${DEEPSEEK_FISH_VIEWBOX}"])::before {
+  content: "";
+  width: 32px;
+  height: 32px;
+  background: url("${AVTI_LOGO_DATA_URI}") center / contain no-repeat;
+}
+div:has(> span > svg[viewBox="${DEEPSEEK_FISH_VIEWBOX}"])::after {
+  content: "Time to work!";
+  color: var(--dsw-alias-label-primary);
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 32px;
+  white-space: nowrap;
+}
+`
+
 /** Advanced-shell stylesheet kept as a plain string so the package client bundle stays self-contained. */
 const ADVANCED_STYLES = `
 html, body, #root { width: 100%; height: 100%; }
@@ -44,12 +109,21 @@ html:has([aria-modal="true"]) .dshDesktopSidebarSurface::before { -webkit-app-re
 @media (prefers-reduced-motion: reduce) { .dshDesktopFrame { transition: none !important; } }
 `
 
-/** Install and remove the advanced shell's global native-window styles. @returns the style disposer. */
-export function installAdvancedStyles(): () => void {
+function installStyles(kind: string, css: string): () => void {
   const style = document.createElement('style')
   style.dataset.plugin = 'dsh-plugin-desktop'
-  style.dataset.pluginCss = 'dsh-plugin-desktop/advanced-shell'
-  style.textContent = ADVANCED_STYLES
+  style.dataset.pluginCss = kind
+  style.textContent = css
   document.head.appendChild(style)
   return () => { style.remove() }
+}
+
+/** Install Avti product branding in compatibility and advanced desktop modes. */
+export function installBrandingStyles(): () => void {
+  return installStyles('dsh-plugin-desktop/branding', BRANDING_STYLES)
+}
+
+/** Install and remove the advanced shell's global native-window styles. @returns the style disposer. */
+export function installAdvancedStyles(): () => void {
+  return installStyles('dsh-plugin-desktop/advanced-shell', ADVANCED_STYLES)
 }

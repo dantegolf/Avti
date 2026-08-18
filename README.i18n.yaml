@@ -1,6 +1,6 @@
 # Multilingual README consistency record: the git blob hash of each translation as of
 # the last confirmed-consistent state. All language versions carry equal authority.
 # Update every affected file and re-record the hashes after editing the README set.
-README.md: 040edf2a26d18faf123ae7d5758099126a0bc6f4
-README.en.md: c48cdd29c2370ff63ac66c8bb8542af595085dc8
-README.ru.md: 101e693ebfaa7f53b7e083c451fe22d1063a826d
+README.md: 2b2c2dd79d0dd685a390167c38f88b270374eff8
+README.en.md: 9566faef2ae0f47855095841d67bdfc34c12345d
+README.ru.md: 6b1403904a14664916f383f004c41e57752edb2f

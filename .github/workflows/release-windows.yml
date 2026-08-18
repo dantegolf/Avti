@@ -1,0 +1,111 @@
+name: Release Windows
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag, for example v2.0.1'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Build Windows installer
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Enable Yarn
+        shell: pwsh
+        run: |
+          corepack enable
+          corepack prepare yarn@4.18.0 --activate
+          yarn --version
+
+      - name: Install dependencies
+        shell: pwsh
+        run: yarn install --immutable
+
+      - name: Resolve release metadata
+        id: meta
+        shell: pwsh
+        run: |
+          $version = node -p "require('./dsh-plugin-desktop/package.json').version"
+          if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+            $tag = '${{ inputs.tag }}'
+          } else {
+            $tag = '${{ github.ref_name }}'
+          }
+
+          if ($tag -ne "v$version") {
+            throw "Release tag $tag does not match dsh-plugin-desktop version $version"
+          }
+
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Build and verify Windows installer
+        shell: pwsh
+        run: yarn dist:win
+
+      - name: Generate SHA-256 manifest
+        id: artifact
+        shell: pwsh
+        run: |
+          $artifact = Get-ChildItem 'dsh-plugin-desktop/dist' -Filter 'Avti-*-x64-Setup.exe' | Select-Object -First 1
+          if (-not $artifact) {
+            throw 'Windows installer artifact was not produced.'
+          }
+
+          $hash = (Get-FileHash -Path $artifact.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $manifest = Join-Path $artifact.Directory.FullName 'SHA256SUMS.txt'
+          "$hash  $($artifact.Name)" | Set-Content -Path $manifest -Encoding ascii
+
+          "installer=$($artifact.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "checksum=$manifest" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.meta.outputs.version }}
+          RELEASE_TARGET: ${{ github.sha }}
+          INSTALLER: ${{ steps.artifact.outputs.installer }}
+          CHECKSUM: ${{ steps.artifact.outputs.checksum }}
+        run: |
+          gh release view $env:RELEASE_TAG 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:RELEASE_TAG $env:INSTALLER $env:CHECKSUM --clobber
+            exit $LASTEXITCODE
+          }
+
+          $notes = @"
+          ## Avti $env:RELEASE_VERSION
+
+          Download the Windows x64 installer below, or install from PowerShell with the command shown in the README.
+
+          > Current Windows builds are unsigned. Windows SmartScreen may display a warning until Authenticode signing is added to the release pipeline.
+          "@
+
+          gh release create $env:RELEASE_TAG `
+            $env:INSTALLER `
+            $env:CHECKSUM `
+            --target $env:RELEASE_TARGET `
+            --title "Avti $env:RELEASE_VERSION" `
+            --notes $notes
