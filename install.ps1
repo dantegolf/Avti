@@ -36,14 +36,22 @@ function Fail([string]$Message) {
 }
 
 function Get-Release {
-  if ($Version -eq 'latest') {
-    Write-Verbose 'Resolving the latest GitHub release.'
-    return Invoke-RestMethod -Uri "$ApiBase/releases/latest" -Headers $Headers
-  }
+  try {
+    if ($Version -eq 'latest') {
+      Write-Verbose 'Resolving the latest GitHub release.'
+      return Invoke-RestMethod -Uri "$ApiBase/releases/latest" -Headers $Headers
+    }
 
-  $Tag = if ($Version.StartsWith('v')) { $Version } else { "v$Version" }
-  Write-Verbose "Resolving GitHub release $Tag."
-  return Invoke-RestMethod -Uri "$ApiBase/releases/tags/$Tag" -Headers $Headers
+    $Tag = if ($Version.StartsWith('v')) { $Version } else { "v$Version" }
+    Write-Verbose "Resolving GitHub release $Tag."
+    return Invoke-RestMethod -Uri "$ApiBase/releases/tags/$Tag" -Headers $Headers
+  } catch {
+    $StatusCode = $_.Exception.Response.StatusCode.value__
+    if ($StatusCode -eq 404) {
+      Fail 'no downloadable Avti release is published yet. Publish v2.0.1 from GitHub Actions > Release Windows, then run this command again.'
+    }
+    throw
+  }
 }
 
 function Find-Asset($Release, [string]$Pattern, [string]$Description) {
@@ -152,5 +160,5 @@ try {
   Write-Host ('  ! ' + $_.Exception.Message) -ForegroundColor Red
   Write-Host '    Re-run with -Verbose for more detail.' -ForegroundColor DarkGray
   Write-Host ''
-  exit 1
+  return
 }
