@@ -8,7 +8,7 @@
   A desktop AI coding workspace for local projects: agent conversations, project tools, a terminal and plugin management in one app.
 </p>
 
-<p align="center"><a href="README.md">中文</a> · <strong>English</strong></p>
+<p align="center"><a href="README.md">中文</a> · <strong>English</strong> · <a href="README.ru.md">Русский</a></p>
 
 ## What is Avti?
 
