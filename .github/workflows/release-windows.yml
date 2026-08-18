@@ -21,12 +21,12 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '24'
 
@@ -85,6 +85,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.meta.outputs.tag }}
           RELEASE_VERSION: ${{ steps.meta.outputs.version }}
+          RELEASE_TARGET: ${{ github.sha }}
           INSTALLER: ${{ steps.artifact.outputs.installer }}
           CHECKSUM: ${{ steps.artifact.outputs.checksum }}
         run: |
@@ -105,5 +106,6 @@ jobs:
           gh release create $env:RELEASE_TAG `
             $env:INSTALLER `
             $env:CHECKSUM `
+            --target $env:RELEASE_TARGET `
             --title "Avti $env:RELEASE_VERSION" `
             --notes $notes
