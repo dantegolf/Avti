@@ -86,7 +86,8 @@ import type { RendererBootReport } from './renderer-boot-contract.ts'
 import { desktopLocaleFromLanguageTag } from './tray-locale.ts'
 
 const BIN_NAME = 'dsh-plugin-desktop'
-const PRODUCT_NAME = 'DSH Desktop'
+const PRODUCT_NAME = 'Avti'
+const WINDOWS_APP_ID = 'com.dantegolf.avti'
 
 class RendererStartupFailure extends Error {
   constructor(
@@ -116,14 +117,14 @@ async function showInstallRollbackNotice(
   const copy = locale === 'zh'
     ? {
         title: '插件安装已回滚',
-        message: `DSH Desktop 已恢复安装 ${transaction.packageName} 前的配置。`,
-        detail: '上一次启动未能通过健康验证。DSH Desktop 已在本地保存诊断信息，并恢复 package.json、pnpm-lock.yaml 和 pnpm-workspace.yaml；诊断信息不会自动上传。',
+        message: `${PRODUCT_NAME} 已恢复安装 ${transaction.packageName} 前的配置。`,
+        detail: `上一次启动未能通过健康验证。${PRODUCT_NAME} 已在本地保存诊断信息，并恢复 package.json、pnpm-lock.yaml 和 pnpm-workspace.yaml；诊断信息不会自动上传。`,
         confirm: '知道了',
       }
     : {
         title: 'Plugin installation rolled back',
-        message: `DSH Desktop restored the configuration from before ${transaction.packageName} was installed.`,
-        detail: 'The previous startup did not pass its health check. DSH Desktop saved diagnostics locally and restored package.json, pnpm-lock.yaml, and pnpm-workspace.yaml. Diagnostics are not uploaded automatically.',
+        message: `${PRODUCT_NAME} restored the configuration from before ${transaction.packageName} was installed.`,
+        detail: `The previous startup did not pass its health check. ${PRODUCT_NAME} saved diagnostics locally and restored package.json, pnpm-lock.yaml, and pnpm-workspace.yaml. Diagnostics are not uploaded automatically.`,
         confirm: 'OK',
       }
   try {
@@ -385,7 +386,7 @@ async function start(): Promise<void> {
   try {
     await app.whenReady()
     startupStage = 'shell-environment'
-    if (process.platform === 'win32') app.setAppUserModelId('ai.deepseek.dsh.desktop')
+    if (process.platform === 'win32') app.setAppUserModelId(WINDOWS_APP_ID)
     if (app.isPackaged && process.cwd() === '/') process.chdir(app.getPath('home'))
     const shellEnvironmentResolution = await resolveDesktopShellEnvironment({
       environment: process.env,

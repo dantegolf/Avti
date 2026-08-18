@@ -16,13 +16,13 @@ function portableExecutable(): Buffer {
 }
 
 function fixture(version = '2.0.0'): { readonly root: string; readonly portable: string } {
-  const root = mkdtempSync(join(tmpdir(), 'dsh-win-portable-'))
+  const root = mkdtempSync(join(tmpdir(), 'avti-win-portable-'))
   temporaryRoots.push(root)
   const dist = join(root, 'dist')
   mkdirSync(dist, { recursive: true })
-  const portable = join(dist, `DSH-Desktop-${version}-x64-Portable.zip`)
+  const portable = join(dist, `Avti-${version}-x64-Portable.zip`)
   const archive = new AdmZip()
-  archive.addFile('DSH Desktop.exe', portableExecutable())
+  archive.addFile('Avti.exe', portableExecutable())
   archive.addFile('resources/app.asar', Buffer.from('asar'))
   archive.writeZip(portable)
   return { root, portable }
@@ -43,7 +43,7 @@ describe('Windows portable artifact verification', () => {
     const value = fixture('1.9.0')
 
     expect(() => verifyWindowsPortable({ desktopRoot: value.root, version: '2.0.0' }))
-      .toThrow('DSH-Desktop-2.0.0-x64-Portable.zip')
+      .toThrow('Avti-2.0.0-x64-Portable.zip')
   })
 
   it('rejects an application entry without a Windows PE header', () => {
@@ -51,7 +51,7 @@ describe('Windows portable artifact verification', () => {
     const invalid = portableExecutable()
     invalid.write('NO', 0, 'ascii')
     const archive = new AdmZip()
-    archive.addFile('DSH Desktop.exe', invalid)
+    archive.addFile('Avti.exe', invalid)
     archive.addFile('resources/app.asar', Buffer.from('asar'))
     archive.writeZip(value.portable)
 

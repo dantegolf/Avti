@@ -1,8 +1,8 @@
 {
-  "name": "deepseek-harness-desktop",
+  "name": "avti",
   "version": "2.0.1",
   "private": true,
-  "description": "DSH Desktop product workspace",
+  "description": "Avti desktop workspace",
   "license": "MIT",
   "packageManager": "yarn@4.18.0",
   "engines": {
@@ -62,9 +62,6 @@
     "dist:mac": "yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:mac",
     "dist:mac-smoke": "yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:mac-smoke",
     "dist:win": "yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win",
-    "dist:win-portable": "yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win-portable",
-    "upstream:version": "cd deepseek-harness && corepack pnpm --version",
-    "upstream:install": "cd deepseek-harness && corepack pnpm install --frozen-lockfile",
-    "upstream:build": "cd deepseek-harness && corepack pnpm run build"
+    "dist:win-portable": "yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win-portable"
   }
 }

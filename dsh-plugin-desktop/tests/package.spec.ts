@@ -115,13 +115,15 @@ describe('published package surface', () => {
         '@deepseek-ai/dsh-client-ui-theme',
       ],
     })
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop')
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-community-market')
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/terminal')
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/pnpm')
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/profiles')
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/diagnostics')
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/updates')
+    const patch = readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')
+    expect(patch).toContain('name: dsh-plugin-desktop')
+    expect(patch).toContain('name: dsh-community-market')
+    expect(patch).toContain('name: dsh-plugin-desktop/terminal')
+    expect(patch).toContain('name: dsh-plugin-desktop/pnpm')
+    expect(patch).toContain('name: dsh-plugin-desktop/profiles')
+    expect(patch).toContain('name: dsh-plugin-desktop/diagnostics')
+    expect(patch).toContain('name: dsh-plugin-desktop/updates')
+    expect(patch).toContain('disabled: true')
   })
 
   it('keeps unaudited marketplace packages out of the published runtime', () => {
@@ -304,8 +306,8 @@ describe('published package surface', () => {
 
   it('fixes the installed application identity', () => {
     expect(manifest.version).toBe(workspaceManifest.version)
-    expect(manifest.build?.productName).toBe('DSH Desktop')
-    expect(manifest.build?.appId).toBe('ai.deepseek.dsh.desktop')
+    expect(manifest.build?.productName).toBe('Avti')
+    expect(manifest.build?.appId).toBe('com.dantegolf.avti')
     expect(manifest.build?.asarUnpack).toEqual([
       'package.json',
       'cordis.patch.yml',
@@ -338,7 +340,7 @@ describe('published package surface', () => {
       target: 'nsis',
       arch: ['x64'],
     }])
-    expect(manifest.build?.win?.artifactName).toBe('DSH-Desktop-${version}-${arch}-Portable.${ext}')
+    expect(manifest.build?.win?.artifactName).toBe('Avti-${version}-${arch}-Portable.${ext}')
     expect(manifest.build?.nsis).toEqual({
       license: 'THIRD_PARTY_NOTICES.md',
       oneClick: false,
@@ -348,9 +350,9 @@ describe('published package surface', () => {
       createDesktopShortcut: true,
       createStartMenuShortcut: true,
       differentialPackage: false,
-      shortcutName: 'DSH Desktop',
+      shortcutName: 'Avti',
       useZip: true,
-      artifactName: 'DSH-Desktop-${version}-${arch}-Setup.${ext}',
+      artifactName: 'Avti-${version}-${arch}-Setup.${ext}',
     })
     expect(manifest.build?.linux?.icon).toBe('build/app-icon.png')
   })

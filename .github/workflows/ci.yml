@@ -2,9 +2,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [master]
+    branches: [main]
   push:
-    branches: [master]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -25,7 +25,6 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-          submodules: recursive
       - uses: actions/setup-node@v6
         with:
           node-version: 22.23.2
@@ -40,15 +39,13 @@ jobs:
       - run: yarn install --immutable
       - run: yarn check
 
-  # Windows-only logic and unsigned NSIS/portable builds on a real Windows runner:
-  # updates, window options, pwsh sandbox, volume diagnostics, and packaging.
+  # Windows-only logic and unsigned NSIS/portable builds on a real Windows runner.
   desktop-windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-          submodules: recursive
       - uses: actions/setup-node@v6
         with:
           node-version: 22.23.2
@@ -76,7 +73,6 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-          submodules: recursive
       - uses: actions/setup-node@v6
         with:
           node-version: 22.23.2
@@ -91,19 +87,3 @@ jobs:
       - run: yarn install --immutable
       - run: yarn workspace dsh-community-market check
       - run: yarn dist:mac-smoke
-
-  # Upstream toolchain smoke: the portable-shell scripts must resolve the
-  # pinned submodule's own Yarn/pnpm release on Windows.
-  upstream-command-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-          submodules: recursive
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22.23.2
-      - run: corepack enable
-      - run: yarn check:layout
-      - run: yarn upstream:version

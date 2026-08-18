@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, lstatSync, readFileSync, readlinkSync } from 'node:fs'
-import { basename, resolve } from 'node:path'
+import { resolve } from 'node:path'
 
 const root = resolve(import.meta.dirname, '..')
 const readJson = path => JSON.parse(readFileSync(resolve(root, path), 'utf8'))
@@ -12,15 +12,9 @@ const run = (command, args, cwd = root) => execFileSync(command, args, {
 const fail = message => { throw new Error(`verify-layout: ${message}`) }
 
 const workspace = readJson('package.json')
-const upstream = readJson('upstream.json')
 const plugin = readJson('dsh-plugin-desktop/package.json')
 const fabric = readJson('dsh-community-fabric/package.json')
 const market = readJson('dsh-community-market/package.json')
-const upstreamPackage = readJson('deepseek-harness/package.json')
-const noteDirectory = '.agents/notes/implemented/process'
-const noteName = '2026-08-15-pinned-upstream-and-isolated-yarn-workspace'
-const notePaths = [`${noteDirectory}/${noteName}.md`, `${noteDirectory}/${noteName}.zh.md`]
-const noteRecordPath = `${noteDirectory}/${noteName}.i18n.yaml`
 
 if (workspace.packageManager !== 'yarn@4.18.0') {
   fail('the product workspace must pin yarn@4.18.0')
@@ -41,6 +35,7 @@ for (const [name, manifest] of [
 }
 if (fabric.name !== 'dsh-community-fabric') fail('the Fabric workspace must own dsh-community-fabric')
 if (market.name !== 'dsh-community-market') fail('the market workspace must own dsh-community-market')
+
 const claudePath = resolve(root, 'CLAUDE.md')
 const claudeStat = lstatSync(claudePath)
 // Windows checkouts materialize the symlink as a regular file holding the
@@ -51,6 +46,7 @@ const claudeTarget = claudeStat.isSymbolicLink()
 if (claudeTarget !== 'AGENTS.md') {
   fail('CLAUDE.md must link to the outer repository AGENTS.md')
 }
+
 for (const legacyFile of [
   'pnpm-lock.yaml',
   'pnpm-workspace.yaml',
@@ -63,14 +59,11 @@ for (const legacyFile of [
 ]) {
   if (existsSync(resolve(root, legacyFile))) fail(`${legacyFile} must not exist`)
 }
-if (run('git', ['config', '-f', '.gitmodules', '--get', 'submodule.deepseek-harness.path']) !== 'deepseek-harness') {
-  fail('the upstream submodule path must be deepseek-harness')
-}
-if (run('git', ['config', '-f', '.gitmodules', '--get', 'submodule.deepseek-harness.url']) !== upstream.repository) {
-  fail('the upstream submodule URL differs from upstream.json')
-}
-if (typeof upstreamPackage.packageManager !== 'string' || !upstreamPackage.packageManager.startsWith('pnpm@')) {
-  fail('the upstream checkout must retain its pnpm package manager')
+
+for (const removedUpstreamPath of ['.gitmodules', 'upstream.json', 'deepseek-harness']) {
+  if (existsSync(resolve(root, removedUpstreamPath))) {
+    fail(`${removedUpstreamPath} must not exist in standalone Avti`)
+  }
 }
 
 for (const [owner, manifest] of [
@@ -82,45 +75,10 @@ for (const [owner, manifest] of [
   for (const field of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies', 'resolutions']) {
     for (const [name, range] of Object.entries(manifest[field] ?? {})) {
       if (typeof range !== 'string') continue
-      if (/^(?:workspace|portal|link):/u.test(range)
-        || (range.startsWith('file:') && range.includes('deepseek-harness'))) {
-        fail(`${owner} ${field}.${name} bypasses the published DSH package boundary`)
+      if (range.startsWith('git+') || range.startsWith('git://') || /github\.com.+\.git(?:#|$)/u.test(range)) {
+        fail(`${owner} ${field}.${name} must not depend on a Git repository directly`)
       }
     }
-  }
-}
-
-const [mode, object] = run('git', ['ls-files', '--stage', '--', 'deepseek-harness']).split(/\s+/u)
-if (mode !== '160000') fail('deepseek-harness must be tracked as a Git submodule')
-if (object !== upstream.commit) fail(`submodule index is ${object}, expected ${upstream.commit}`)
-
-const upstreamDir = resolve(root, 'deepseek-harness')
-if (run('git', ['rev-parse', 'HEAD'], upstreamDir) !== upstream.commit) {
-  fail('checked-out upstream commit differs from upstream.json')
-}
-if (run('git', ['status', '--porcelain'], upstreamDir) !== '') {
-  fail('deepseek-harness contains local changes')
-}
-if (run('git', ['remote', 'get-url', 'origin'], upstreamDir) !== upstream.repository) {
-  fail('deepseek-harness origin differs from upstream.json')
-}
-if (upstreamPackage.version !== upstream.sourceVersion) {
-  fail('deepseek-harness package version differs from upstream.json')
-}
-for (const name of Object.keys(plugin.dependencies).filter(name => name === '@deepseek-ai/dsh' || name.startsWith('@deepseek-ai/dsh-'))) {
-  if (plugin.dependencies[name] !== upstream.runtimePackageVersion) {
-    fail(`${name} must use the recorded DSH runtime package family`)
-  }
-}
-
-const noteRecord = readFileSync(resolve(root, noteRecordPath), 'utf8')
-for (const notePath of notePaths) {
-  // Hash the committed blob, not the working tree: checkout line endings
-  // differ per host, while HEAD:<path> is identical everywhere.
-  const expected = run('git', ['rev-parse', `HEAD:${notePath}`])
-  const recordLine = `${basename(notePath)}: ${expected}`
-  if (!noteRecord.split(/\r?\n/u).includes(recordLine)) {
-    fail(`${noteRecordPath} is stale for ${notePath}`)
   }
 }
 
@@ -133,4 +91,4 @@ for (const readmeName of ['README.md', 'README.en.md']) {
   }
 }
 
-process.stdout.write(`verify-layout: Yarn workspace and upstream ${upstream.commit.slice(0, 10)} are consistent\n`)
+process.stdout.write('verify-layout: standalone Avti Yarn workspace is consistent\n')

@@ -44,9 +44,9 @@ function defaultOptions(): MacReleaseVerificationOptions {
     distDir: process.argv[2] === undefined
       ? join(packageRoot, 'dist', 'mac-release')
       : resolve(process.argv[2]),
-    productName: 'DSH Desktop',
+    productName: 'Avti',
     listDmgs,
-    makeMountPoint: () => mkdtempSync(join(tmpdir(), 'dsh-desktop-dmg-')),
+    makeMountPoint: () => mkdtempSync(join(tmpdir(), 'avti-dmg-')),
     run,
     removeMountPoint: mountPoint => rmdirSync(mountPoint),
   }
