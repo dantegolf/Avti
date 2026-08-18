@@ -434,12 +434,12 @@ describe('published package surface', () => {
     }
   })
 
-  it('keeps the iOS Default source icon unmodified', () => {
+  it('keeps the Avti source icon stable', () => {
     const digest = createHash('sha256')
-      .update(readFileSync(new URL('build/app-icon.png', packageRoot)))
+      .update(readFileSync(new URL('build/avti-icon.svg', packageRoot)))
       .digest('hex')
 
-    expect(digest).toBe('315fbc6e57ff1f34894f21f66fb7f9f26deccf78333c71fad21a6cec64e7de80')
+    expect(digest).toBe('4c79b000e769558a538aaf0b2e0f533457f90e1d85ae607ba1ed95623d457264')
   })
 
   it('generates a centered macOS icon with a 100-pixel visual inset', async () => {
