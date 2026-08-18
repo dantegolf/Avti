@@ -83,7 +83,7 @@ for (const [owner, manifest] of [
 }
 
 const readmeRecord = readFileSync(resolve(root, 'README.i18n.yaml'), 'utf8')
-for (const readmeName of ['README.md', 'README.en.md']) {
+for (const readmeName of ['README.md', 'README.en.md', 'README.ru.md']) {
   const expected = run('git', ['rev-parse', `HEAD:${readmeName}`])
   const recordLine = `${readmeName}: ${expected}`
   if (!readmeRecord.split(/\r?\n/u).includes(recordLine)) {
