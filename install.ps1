@@ -119,8 +119,11 @@ try {
   Write-Ok 'SHA-256 verified'
 
   Write-Step 'Installing Avti...'
-  $Arguments = if ($Interactive) { @() } else { @('/S') }
-  $Process = Start-Process -FilePath $InstallerPath -ArgumentList $Arguments -Wait -PassThru
+  if ($Interactive) {
+    $Process = Start-Process -FilePath $InstallerPath -Wait -PassThru
+  } else {
+    $Process = Start-Process -FilePath $InstallerPath -ArgumentList '/S' -Wait -PassThru
+  }
   if ($Process.ExitCode -ne 0) {
     Fail "installer exited with code $($Process.ExitCode)."
   }
