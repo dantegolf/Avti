@@ -5,8 +5,7 @@
 <h1 align="center">Avti</h1>
 
 <p align="center">
-  A desktop AI workspace for local projects.<br>
-  Agent, project tools, terminal and plugins in one app.
+  A local AI workspace for working with projects.
 </p>
 
 <p align="center">
@@ -15,7 +14,9 @@
   <a href="#install-from-powershell">Install from PowerShell</a>
 </p>
 
-<p align="center"><a href="README.md">中文</a> · <strong>English</strong> · <a href="README.ru.md">Русский</a></p>
+<p align="center"><a href="README.md">Русский</a> · <strong>English</strong> · <a href="README.zh.md">中文</a></p>
+
+<p align="center"><code>ai-agent</code> · <code>desktop</code> · <code>local-projects</code> · <code>electron</code> · <code>plugins</code> · <code>windows</code></p>
 
 ## Quick start
 
