@@ -1,6 +1,6 @@
 /** Avti CLI control commands backed directly by Harness services. */
 
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { accessSync, constants, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -8,6 +8,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { ModelSelection } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-default-model'
 import { loadLayeredEnv } from '@deepseek-ai/dsh-app-boot'
+import type {} from '@deepseek-ai/dsh-session-persistence'
 import type {} from '@deepseek-ai/dsh-session-query'
 import { packagedDependencyPath } from './packaged-runtime-path.ts'
 
@@ -111,6 +112,61 @@ async function showSessions(ctx: Context): Promise<void> {
   }
 }
 
+async function runDoctor(ctx: Context): Promise<void> {
+  const checks: Array<{ label: string; run: () => void | Promise<void> }> = [
+    {
+      label: 'Workspace',
+      run: () => { accessSync(process.cwd(), constants.R_OK | constants.W_OK) },
+    },
+    {
+      label: 'Agent runtime',
+      run: () => { if (ctx.get('agents') === undefined) throw new Error('agent registry unavailable') },
+    },
+    {
+      label: 'Session persistence',
+      run: () => { if (ctx.get('sessionPersistence') === undefined) throw new Error('persistence unavailable') },
+    },
+    {
+      label: 'Session history',
+      run: () => { if (ctx.get('sessionQuery') === undefined) throw new Error('session query unavailable') },
+    },
+    {
+      label: 'Provider',
+      run: () => {
+        const llm = ctx.get('llm')
+        const selection = ctx.get('agentDefaultModel')?.currentSelection()
+        if (llm === undefined || selection === undefined) throw new Error('model services unavailable')
+        if (!llm.listProviders().some(provider => provider.id === selection.provider)) {
+          throw new Error(`provider not registered: ${selection.provider}`)
+        }
+      },
+    },
+    {
+      label: 'Model',
+      run: async () => {
+        const llm = ctx.get('llm')
+        const selection = ctx.get('agentDefaultModel')?.currentSelection()
+        if (llm === undefined || selection === undefined) throw new Error('model services unavailable')
+        await llm.resolveModelInfo(selection.provider, selection.model)
+      },
+    },
+  ]
+
+  process.stdout.write('AVTI Doctor\n\n')
+  let failed = 0
+  for (const check of checks) {
+    try {
+      await check.run()
+      process.stdout.write(`✓ ${check.label}\n`)
+    } catch (error: unknown) {
+      failed += 1
+      process.stdout.write(`× ${check.label} · ${error instanceof Error ? error.message : String(error)}\n`)
+    }
+  }
+  process.stdout.write(failed === 0 ? '\nReady.\n' : `\n${failed} check(s) need attention.\n`)
+  if (failed > 0) process.exitCode = 1
+}
+
 /** Run one short Avti control command and dispose the same Harness profile cleanly. */
 export async function runAvtiControl(command: string, args: readonly string[]): Promise<void> {
   const { ctx, shutdown } = await bootControl()
@@ -132,10 +188,13 @@ export async function runAvtiControl(command: string, args: readonly string[]): 
       case 'sessions':
         await showSessions(ctx)
         return
+      case 'doctor':
+        await runDoctor(ctx)
+        return
       default:
         throw new Error(`unknown Avti command: ${command}`)
     }
   } finally {
-    await shutdown.shutdown(0)
+    await shutdown.shutdown(process.exitCode === 1 ? 1 : 0)
   }
 }
