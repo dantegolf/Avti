@@ -63,7 +63,6 @@ jobs:
           corepack prepare yarn@4.18.0 --activate
       - name: Install dependencies
         shell: pwsh
-        # TODO: restore --immutable after yarn.lock contains the avti-cli workspace entry.
         run: yarn install
       - name: Typecheck standalone CLI
         shell: pwsh
@@ -134,7 +133,6 @@ jobs:
           corepack prepare yarn@4.18.0 --activate
       - name: Install dependencies
         shell: bash
-        # TODO: restore --immutable after yarn.lock contains the avti-cli workspace entry.
         run: yarn install
       - name: Typecheck standalone CLI
         shell: bash
@@ -185,6 +183,7 @@ jobs:
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ needs.metadata.outputs.tag }}
           RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
           RELEASE_TARGET: ${{ github.sha }}
@@ -192,27 +191,34 @@ jobs:
         run: |
           set -euo pipefail
           files=(release/*)
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" "${files[@]}" --clobber
+          if (( ${#files[@]} == 0 )); then
+            echo 'No CLI release artifacts were downloaded.' >&2
+            exit 1
+          fi
+
+          if gh release view "$RELEASE_TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "${files[@]}" --repo "$GH_REPO" --clobber
             exit 0
           fi
 
-          cat > "$RUNNER_TEMP/avti-cli-release-notes.md" <<EOF
-          ## Avti CLI $RELEASE_VERSION
-
-          Standalone terminal agent for local projects. Avti Desktop, Node.js and Yarn are not required.
-
-          Artifacts:
-          - Windows x64: \`avti-windows-x64.zip\`
-          - macOS Apple Silicon: \`avti-macos-arm64.tar.gz\`
-          - macOS Intel: \`avti-macos-x64.tar.gz\`
-
-          Each platform artifact has a matching SHA-256 manifest.
-
-          Current CLI builds are unsigned. macOS signing/notarization and Windows code signing will be added independently from Desktop signing.
-          EOF
+          notes="$RUNNER_TEMP/avti-cli-release-notes.md"
+          printf '%s\n' \
+            "## Avti CLI $RELEASE_VERSION" \
+            '' \
+            'Standalone terminal agent for local projects. Avti Desktop, Node.js and Yarn are not required.' \
+            '' \
+            'Artifacts:' \
+            '- Windows x64: avti-windows-x64.zip' \
+            '- macOS Apple Silicon: avti-macos-arm64.tar.gz' \
+            '- macOS Intel: avti-macos-x64.tar.gz' \
+            '' \
+            'Each platform artifact has a matching SHA-256 manifest.' \
+            '' \
+            'Current CLI builds are unsigned. macOS signing/notarization and Windows code signing will be added independently from Desktop signing.' \
+            > "$notes"
 
           gh release create "$RELEASE_TAG" "${files[@]}" \
+            --repo "$GH_REPO" \
             --target "$RELEASE_TARGET" \
             --title "Avti CLI $RELEASE_VERSION" \
-            --notes-file "$RUNNER_TEMP/avti-cli-release-notes.md"
+            --notes-file "$notes"
