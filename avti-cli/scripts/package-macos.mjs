@@ -18,7 +18,7 @@ const appRoot = join(outputRoot, 'app')
 const runtimeNodeModules = join(repoRoot, 'dsh-plugin-desktop', 'node_modules')
 const libRoot = join(packageRoot, 'lib')
 
-if (!existsSync(join(libRoot, 'avti.js'))) {
+if (!existsSync(join(libRoot, 'avti.js')) || !existsSync(join(libRoot, 'avti-profile-boot.js'))) {
   throw new Error('Avti CLI build output is missing; run the build before packaging')
 }
 if (!existsSync(runtimeNodeModules)) {
@@ -58,6 +58,15 @@ if (existsSync(join(packagedNodeModules, 'dsh-plugin-desktop'))) {
 
 cpSync(libRoot, join(appRoot, 'lib'), { recursive: true, force: true })
 copyFileSync(join(packageRoot, 'package.json'), join(appRoot, 'package.json'))
+
+// rc.7's npm package doesn't publish dsh/lib/profile-boot.js. Keep the existing
+// renderer contract stable by installing a tiny shim to Avti's public-package adapter.
+const dshLibRoot = join(packagedNodeModules, '@deepseek-ai', 'dsh', 'lib')
+mkdirSync(dshLibRoot, { recursive: true })
+writeFileSync(
+  join(dshLibRoot, 'profile-boot.js'),
+  "export { runProfile } from '../../../../lib/avti-profile-boot.js'\n",
+)
 
 const nodePath = join(outputRoot, 'node')
 copyFileSync(process.execPath, nodePath)
