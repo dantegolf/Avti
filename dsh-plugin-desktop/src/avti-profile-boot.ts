@@ -7,10 +7,12 @@
  */
 
 import { writeFileSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
+import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import {
   boot,
+  composeEntries,
   healProfilesModuleFallback,
   loadOptionalPatches,
   loadOverlayPatches,
@@ -29,6 +31,7 @@ const BIN_NAME = 'dsh'
 const PROFILE_ROOT_FILENAME = 'cordis.yml'
 const PROFILE_ROOT_CONFIG = '[]\n'
 const INSTALL_ANCHOR = packagedDependencyPath(import.meta.url, '@deepseek-ai/dsh/package.json')
+const SHIPPED_PRESET_ROOT = join(dirname(INSTALL_ANCHOR), 'config', 'agent-presets')
 
 export interface AvtiProfileBootOptions {
   readonly environment: LaunchEnvironmentSnapshot
@@ -41,26 +44,44 @@ export interface AvtiProcessShutdown {
   shutdown(code: number): Promise<void>
 }
 
+function objectConfig(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+}
+
 /** Boot one Harness profile for Avti without relying on unpublished dsh internals. */
 export async function runProfile(
   options: AvtiProfileBootOptions,
 ): Promise<{ ctx: Context; shutdown: AvtiProcessShutdown }> {
-  healProfilesModuleFallback(INSTALL_ANCHOR)
-  const profile = loadProfile(BIN_NAME, options.profile, INSTALL_ANCHOR)
+  const home = resolveDshHome()
+  healProfilesModuleFallback(INSTALL_ANCHOR, home)
+  const profile = loadProfile(BIN_NAME, options.profile, INSTALL_ANCHOR, home)
   const rootConfig = join(profile.dir, PROFILE_ROOT_FILENAME)
   writeFileSync(rootConfig, PROFILE_ROOT_CONFIG)
 
   const homePatches = loadOptionalPatches(
     BIN_NAME,
-    join(resolveDshHome(), PROFILE_PATCH_FILENAME),
+    join(home, PROFILE_PATCH_FILENAME),
   ) ?? []
   const overlays = options.patchFiles.flatMap(file => loadOverlayPatches(BIN_NAME, resolve(file)))
-  const patches = [
+  const patches: PatchOptions[] = [
     ...profile.layers.flatMap(layer => layer.patches),
     ...profile.patches,
     ...homePatches,
     ...overlays,
   ]
+
+  const presetRow = composeEntries([patches]).find(row => row.id === 'agent-presets')
+  if (presetRow !== undefined) {
+    patches.push({
+      id: 'agent-presets',
+      config: {
+        ...objectConfig(presetRow.config),
+        roots: [{ path: SHIPPED_PRESET_ROOT, trust: 'system' }],
+      },
+    })
+  }
 
   let ctx: Context | undefined
   let shuttingDown = false
