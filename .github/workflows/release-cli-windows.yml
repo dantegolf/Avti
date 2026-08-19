@@ -69,8 +69,9 @@ jobs:
           corepack prepare yarn@4.18.0 --activate
       - name: Install dependencies
         shell: pwsh
-        # TODO: restore --immutable after yarn.lock contains the avti-cli workspace entry.
-        run: yarn install
+        # First standalone CLI release: allow Yarn to materialize the new workspace entry.
+        # Restore --immutable after the regenerated yarn.lock is committed to the feature branch.
+        run: yarn install --no-immutable
       - name: Typecheck standalone CLI
         shell: pwsh
         run: yarn typecheck:cli
@@ -140,8 +141,9 @@ jobs:
           corepack prepare yarn@4.18.0 --activate
       - name: Install dependencies
         shell: bash
-        # TODO: restore --immutable after yarn.lock contains the avti-cli workspace entry.
-        run: yarn install
+        # First standalone CLI release: allow Yarn to materialize the new workspace entry.
+        # Restore --immutable after the regenerated yarn.lock is committed to the feature branch.
+        run: yarn install --no-immutable
       - name: Typecheck standalone CLI
         shell: bash
         run: yarn typecheck:cli
@@ -209,9 +211,9 @@ jobs:
           Standalone terminal agent for local projects. Avti Desktop, Node.js and Yarn are not required.
 
           Artifacts:
-          - Windows x64: \`avti-windows-x64.zip\`
-          - macOS Apple Silicon: \`avti-macos-arm64.tar.gz\`
-          - macOS Intel: \`avti-macos-x64.tar.gz\`
+          - Windows x64: `avti-windows-x64.zip`
+          - macOS Apple Silicon: `avti-macos-arm64.tar.gz`
+          - macOS Intel: `avti-macos-x64.tar.gz`
 
           Each platform artifact has a matching SHA-256 manifest.
 
