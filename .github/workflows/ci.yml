@@ -145,10 +145,16 @@ jobs:
       - run: yarn typecheck:cli
       # Production focus intentionally prunes the development install after typecheck.
       - run: yarn dist:cli:mac
+      - name: Archive standalone macOS CLI test build
+        shell: bash
+        run: |
+          archive="avti-cli-macos-${{ matrix.arch }}-0.1.3.tar.gz"
+          tar -C avti-cli/dist -czf "$archive" "avti-macos-${{ matrix.arch }}"
+          tar -tzf "$archive" | grep -F "avti-macos-${{ matrix.arch }}/app/node_modules/@earendil-works/pi-ai/dist/providers/data/.manifest.json"
       - name: Upload standalone macOS CLI test build
         uses: actions/upload-artifact@v4
         with:
-          name: avti-cli-macos-${{ matrix.arch }}-0.1.2
-          path: avti-cli/dist/avti-macos-${{ matrix.arch }}/
+          name: avti-cli-macos-${{ matrix.arch }}-0.1.3
+          path: avti-cli-macos-${{ matrix.arch }}-0.1.3.tar.gz
           if-no-files-found: error
           retention-days: 7
