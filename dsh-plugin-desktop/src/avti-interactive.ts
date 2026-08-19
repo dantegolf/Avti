@@ -7,7 +7,12 @@ import { join } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 import { pathToFileURL } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
-import { installModelSelection, type Agent, type ModelSelectionRef } from '@deepseek-ai/dsh-agent'
+import {
+  installModelSelection,
+  type Agent,
+  type AgentHandle,
+  type ModelSelectionRef,
+} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-default-model'
 import { loadLayeredEnv } from '@deepseek-ai/dsh-app-boot'
 import type {} from '@deepseek-ai/cordis-plugin-loader'
@@ -53,6 +58,11 @@ function assistantText(event: SessionEvent<'assistant/message'>): string {
     .join('')
 }
 
+function showActivity(activity: AvtiActivity, label: string): void {
+  activity.update(label)
+  activity.start(label)
+}
+
 function renderSessionEvent(
   event: SessionEvent,
   activity: AvtiActivity,
@@ -68,13 +78,13 @@ function renderSessionEvent(
         state.endsWithNewline = chunk.text.endsWith('\n')
         return
       case 'reasoning-delta':
-        activity.update('Thinking')
+        showActivity(activity, 'Thinking')
         return
       case 'tool-call-delta':
-        if (chunk.name !== undefined && chunk.name !== '') activity.update(`Using ${chunk.name}`)
+        if (chunk.name !== undefined && chunk.name !== '') showActivity(activity, `Using ${chunk.name}`)
         return
       case 'block-start':
-        if (chunk.blockType === 'reasoning') activity.update('Thinking')
+        if (chunk.blockType === 'reasoning') showActivity(activity, 'Thinking')
         return
       case 'block-end':
       case 'usage':
@@ -84,7 +94,7 @@ function renderSessionEvent(
   }
 
   if (event.type === 'tool/call') {
-    activity.update(`Using ${event.data.name}`)
+    showActivity(activity, `Using ${event.data.name}`)
     return
   }
 
@@ -162,7 +172,7 @@ export async function runAvtiInteractive(): Promise<void> {
   }
 
   const ctx = await bootInteractiveProfile()
-  let handle: Awaited<ReturnType<NonNullable<typeof ctx.agents>['create']>> | undefined
+  let handle: AgentHandle | undefined
   const readline = createInterface({ input: process.stdin, output: process.stdout, terminal: true })
 
   try {
