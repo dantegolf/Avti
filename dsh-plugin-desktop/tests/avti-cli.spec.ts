@@ -35,7 +35,7 @@ describe('Avti CLI presentation', () => {
     expect(terminalMotionEnabled({ isTTY: true }, {})).toBe(true)
   })
 
-  it('renders a static wordmark for pipes and automation', async () => {
+  it('keeps pipes and automation free of decorative startup output', async () => {
     let output = ''
     await renderAvtiIntro({
       output: {
@@ -46,6 +46,21 @@ describe('Avti CLI presentation', () => {
         },
       },
       environment: {},
+    })
+    expect(output).toBe('')
+  })
+
+  it('renders a static wordmark when motion is disabled in a real terminal', async () => {
+    let output = ''
+    await renderAvtiIntro({
+      output: {
+        isTTY: true,
+        write(chunk: string) {
+          output += chunk
+          return true
+        },
+      },
+      environment: { AVTI_NO_MOTION: '1' },
     })
     expect(output).toBe('AVTI\n\n')
   })
