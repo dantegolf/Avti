@@ -8,6 +8,7 @@ import {
   latestAvtiSessionSelection,
   type AvtiSessionControlContext,
 } from '../src/avti-session-controls.ts'
+import { AVTI_THEMES } from '../src/avti-theme.ts'
 
 function requestHeader(provider: string, model: string, seq: number): SessionEvent {
   return {
@@ -64,12 +65,33 @@ describe('Avti interactive session controls', () => {
       selection: { current: { provider: 'p', model: 'm' }, assembled: undefined },
       defaultSelection: { provider: 'p', model: 'm' },
       saveSelection: vi.fn(async () => undefined),
+      theme: { current: AVTI_THEMES[0]! },
     } satisfies AvtiSessionControlContext
 
     try {
       await expect(handleAvtiSessionControl('/compact', context)).resolves.toBe('handled')
       expect(execute).toHaveBeenCalledWith(agent, '/compact', expect.any(AbortSignal))
       expect(stdout).toHaveBeenCalledWith(expect.stringContaining('Compacted'))
+    } finally {
+      stdout.mockRestore()
+    }
+  })
+
+  it('lists themes without opening an agent turn', async () => {
+    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    const context = {
+      ctx: { get: vi.fn(() => undefined) } as unknown as Context,
+      agent: { session: { events: [] } } as unknown as Agent,
+      selection: { current: { provider: 'p', model: 'm' }, assembled: undefined },
+      defaultSelection: { provider: 'p', model: 'm' },
+      saveSelection: vi.fn(async () => undefined),
+      theme: { current: AVTI_THEMES[0]! },
+    } satisfies AvtiSessionControlContext
+
+    try {
+      await expect(handleAvtiSessionControl('/theme', context)).resolves.toBe('handled')
+      expect(stdout).toHaveBeenCalledWith(expect.stringContaining('Claude Warm'))
+      expect(stdout).toHaveBeenCalledWith(expect.stringContaining('midnight'))
     } finally {
       stdout.mockRestore()
     }
