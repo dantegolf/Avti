@@ -10,6 +10,7 @@ import type {} from '@deepseek-ai/dsh-agent-default-model'
 import { loadLayeredEnv } from '@deepseek-ai/dsh-app-boot'
 import type {} from '@deepseek-ai/dsh-session-persistence'
 import type {} from '@deepseek-ai/dsh-session-query'
+import { AVTI_ANTIGRAVITY_BASE_URL, AVTI_ANTIGRAVITY_PROVIDER } from './avti-antigravity.ts'
 import { packagedDependencyPath } from './packaged-runtime-path.ts'
 
 const PROFILE_BOOT_URL = pathToFileURL(
@@ -33,7 +34,7 @@ interface ProfileBootModule {
   }): Promise<{ ctx: Context; shutdown: ProcessShutdown }>
 }
 
-async function bootControl(): Promise<{ ctx: Context; shutdown: ProcessShutdown }> {
+async function bootControl(providerPatchPath?: string): Promise<{ ctx: Context; shutdown: ProcessShutdown }> {
   const root = mkdtempSync(join(tmpdir(), 'avti-control-'))
   const patchPath = join(root, 'control.patch.yml')
   writeFileSync(patchPath, CONTROL_PATCH)
@@ -42,7 +43,7 @@ async function bootControl(): Promise<{ ctx: Context; shutdown: ProcessShutdown 
     return await module.runProfile({
       environment: loadLayeredEnv('dsh'),
       profile: 'headless',
-      patchFiles: [patchPath],
+      patchFiles: [patchPath, ...(providerPatchPath === undefined ? [] : [providerPatchPath])],
       args: [],
     })
   } finally {
@@ -112,6 +113,13 @@ async function showSessions(ctx: Context): Promise<void> {
   }
 }
 
+async function antigravityHealth(): Promise<void> {
+  const response = await fetch(`${AVTI_ANTIGRAVITY_BASE_URL}/health`, {
+    signal: AbortSignal.timeout(1500),
+  })
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+}
+
 async function runDoctor(ctx: Context): Promise<void> {
   const checks: Array<{ label: string; run: () => void | Promise<void> }> = [
     {
@@ -152,6 +160,14 @@ async function runDoctor(ctx: Context): Promise<void> {
     },
   ]
 
+  const selection = ctx.get('agentDefaultModel')?.currentSelection()
+  if (selection?.provider === AVTI_ANTIGRAVITY_PROVIDER) {
+    checks.push({
+      label: 'Antigravity proxy',
+      run: antigravityHealth,
+    })
+  }
+
   process.stdout.write('AVTI Doctor\n\n')
   let failed = 0
   for (const check of checks) {
@@ -168,8 +184,12 @@ async function runDoctor(ctx: Context): Promise<void> {
 }
 
 /** Run one short Avti control command and dispose the same Harness profile cleanly. */
-export async function runAvtiControl(command: string, args: readonly string[]): Promise<void> {
-  const { ctx, shutdown } = await bootControl()
+export async function runAvtiControl(
+  command: string,
+  args: readonly string[],
+  providerPatchPath?: string,
+): Promise<void> {
+  const { ctx, shutdown } = await bootControl(providerPatchPath)
   try {
     await ctx.get('loader')?.await()
     switch (command) {
