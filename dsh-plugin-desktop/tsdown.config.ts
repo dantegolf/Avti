@@ -21,6 +21,7 @@ export default defineConfig([
       'desktop-runtime-environment': 'src/desktop-runtime-environment.ts',
       'desktop-terminal': 'src/desktop-terminal.ts',
       'desktop-cli': 'src/desktop-cli.ts',
+      'avti-terminal-style': 'src/avti-terminal-style.ts',
       terminal: 'src/terminal.ts',
       'update-checker': 'src/update-checker.ts',
       'update-download': 'src/update-download.ts',
@@ -41,7 +42,10 @@ export default defineConfig([
   },
   {
     name: `${PACKAGE_NAME}/bin`,
-    entry: { bin: 'src/bin.ts' },
+    entry: {
+      bin: 'src/bin.ts',
+      avti: 'src/avti-cli.ts',
+    },
     outDir: 'lib',
     format: 'esm',
     platform: 'node',
