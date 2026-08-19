@@ -24,7 +24,16 @@ import type {
   AskUserQuestionItem,
   AskUserQuestionRequest,
 } from '@deepseek-ai/dsh-user-questions'
-import { createAvtiActivity, type AvtiActivity } from './avti-terminal-style.ts'
+import {
+  AVTI_ORBIT_FRAMES,
+  AVTI_PULSE_FRAMES,
+  createAvtiActivity,
+  type AvtiActivity,
+} from './avti-terminal-style.ts'
+import {
+  avtiToolPresentation,
+  type AvtiToolPresentation,
+} from './avti-tool-presentation.ts'
 import { packagedDependencyPath } from './packaged-runtime-path.ts'
 
 const PROFILE_BOOT_URL = pathToFileURL(
@@ -55,7 +64,7 @@ interface TurnPresentationState {
   streamedText: boolean
   endsWithNewline: boolean
   turnError?: string
-  readonly toolNames: Map<string, string>
+  readonly tools: Map<string, AvtiToolPresentation>
 }
 
 interface InteractiveUi {
@@ -81,10 +90,22 @@ function prepareActivityLine(state: TurnPresentationState): void {
   }
 }
 
-function showActivity(activity: AvtiActivity, label: string, state: TurnPresentationState): void {
+function showThinking(activity: AvtiActivity, state: TurnPresentationState): void {
   prepareActivityLine(state)
-  activity.update(label)
-  activity.start(label)
+  activity.setFrames(AVTI_ORBIT_FRAMES)
+  activity.update('Thinking')
+  activity.start('Thinking')
+}
+
+function showToolActivity(
+  activity: AvtiActivity,
+  presentation: AvtiToolPresentation,
+  state: TurnPresentationState,
+): void {
+  prepareActivityLine(state)
+  activity.setFrames(AVTI_PULSE_FRAMES)
+  activity.update(presentation.active)
+  activity.start(presentation.active)
 }
 
 async function askTerminal(ui: InteractiveUi, prompt: string, signal?: AbortSignal): Promise<string> {
@@ -94,7 +115,10 @@ async function askTerminal(ui: InteractiveUi, prompt: string, signal?: AbortSign
       ? await ui.readline.question(prompt)
       : await ui.readline.question(prompt, { signal })
   } finally {
-    if (signal?.aborted !== true) ui.activity?.start('Thinking')
+    if (signal?.aborted !== true) {
+      ui.activity?.setFrames(AVTI_ORBIT_FRAMES)
+      ui.activity?.start('Thinking')
+    }
   }
 }
 
@@ -166,7 +190,7 @@ async function answerUserQuestions(
 }
 
 async function answerApproval(ui: InteractiveUi, request: ApprovalRequest): Promise<'allowed-once' | 'rejected'> {
-  process.stdout.write(`\n  Permission required · ${request.toolName}\n`)
+  process.stdout.write(`\n  Permission required · ${avtiToolPresentation(request.toolName).active}\n`)
   if (request.reason !== undefined && request.reason !== '') process.stdout.write(`  ${request.reason}\n`)
   const answer = (await askTerminal(ui, '  Allow once? [y/N] ', request.signal)).trim().toLowerCase()
   process.stdout.write('\n')
@@ -201,13 +225,15 @@ function renderSessionEvent(
         state.endsWithNewline = chunk.text.endsWith('\n')
         return
       case 'reasoning-delta':
-        showActivity(activity, 'Thinking', state)
+        showThinking(activity, state)
         return
       case 'tool-call-delta':
-        if (chunk.name !== undefined && chunk.name !== '') showActivity(activity, `Using ${chunk.name}`, state)
+        if (chunk.name !== undefined && chunk.name !== '') {
+          showToolActivity(activity, avtiToolPresentation(chunk.name), state)
+        }
         return
       case 'block-start':
-        if (chunk.blockType === 'reasoning') showActivity(activity, 'Thinking', state)
+        if (chunk.blockType === 'reasoning') showThinking(activity, state)
         return
       case 'block-end':
       case 'usage':
@@ -218,19 +244,20 @@ function renderSessionEvent(
 
   if (event.type === 'tool/call') {
     const callId = String(event.data.callId)
-    state.toolNames.set(callId, event.data.name)
-    showActivity(activity, `Using ${event.data.name}`, state)
+    const presentation = avtiToolPresentation(event.data.name)
+    state.tools.set(callId, presentation)
+    showToolActivity(activity, presentation, state)
     return
   }
 
   if (event.type === 'tool/result') {
     prepareActivityLine(state)
     const callId = String(event.data.message.source.callId)
-    const name = state.toolNames.get(callId)
-    if (name !== undefined) {
-      if (event.data.error === undefined) activity.succeed(name)
-      else activity.fail(name)
-      state.toolNames.delete(callId)
+    const presentation = state.tools.get(callId)
+    if (presentation !== undefined) {
+      if (event.data.error === undefined) activity.succeed(presentation.success)
+      else activity.fail(presentation.failure)
+      state.tools.delete(callId)
       state.endsWithNewline = true
     }
     return
@@ -255,18 +282,18 @@ function renderSessionEvent(
 }
 
 async function presentTurn(agent: Agent, firstEventIndex: number, ui: InteractiveUi): Promise<void> {
-  const activity = createAvtiActivity()
+  const activity = createAvtiActivity({ frames: AVTI_ORBIT_FRAMES })
   ui.activity = activity
   const state: TurnPresentationState = {
     streamedText: false,
     endsWithNewline: false,
-    toolNames: new Map(),
+    tools: new Map(),
   }
   let eventIndex = firstEventIndex
   let settled = false
   const idle = agent.whenIdle().finally(() => { settled = true })
 
-  activity.start('Thinking')
+  showThinking(activity, state)
 
   const drain = (): void => {
     const events = agent.session.events
