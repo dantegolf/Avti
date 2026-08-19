@@ -4,6 +4,10 @@ import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import {
+  ensureAvtiAntigravityPatch,
+  withAvtiAntigravityPatch,
+} from './avti-antigravity.ts'
 import { runAvtiControl } from './avti-control.ts'
 import { runAvtiInteractive } from './avti-interactive.ts'
 import { packagedDependencyPath } from './packaged-runtime-path.ts'
@@ -43,7 +47,12 @@ Interactive commands:
   /models [provider]              list available models
   /model [provider] <model>       show or change model for following turns
   /sessions                       show recent project sessions
+  /theme [name]                   show or change terminal theme
   /exit                           leave Avti
+
+Model bridges:
+  antigravity                     ClaudeGravity-compatible local provider
+                                  proxy: http://127.0.0.1:8080
 
 State:
   default home                    ~/.avti/cli
@@ -57,7 +66,8 @@ Examples:
   avti resume avti-<session-id>
   avti status
   avti models
-  avti model deepseek-official deepseek-v4-flash
+  avti models antigravity
+  avti model antigravity gemini-3.7-flash-high
   avti doctor
   avti --profile headless "explain this project"
   avti web
@@ -172,6 +182,7 @@ export async function runAvtiCli(
   environment: NodeJS.ProcessEnv = process.env,
   load: (url: string) => Promise<unknown> = url => import(url),
   argv: string[] = process.argv,
+  prepareProviderPatch: (environment: NodeJS.ProcessEnv) => string = ensureAvtiAntigravityPatch,
 ): Promise<void> {
   clearAvtiElectronRunAsNode(environment)
   configureAvtiCliHome(environment)
@@ -185,22 +196,31 @@ export async function runAvtiCli(
     process.stdout.write(`${packageVersion()}\n`)
     return
   }
+
+  const providerPatchPath = prepareProviderPatch(environment)
+  if (environment === process.env) {
+    // runAvtiInteractive/control use loadLayeredEnv(), which reads process.env.
+    // In production this is the same object; keep the local proxy key explicit.
+    process.env.ANTIGRAVITY_API_KEY = environment.ANTIGRAVITY_API_KEY
+  }
+
   if (invocation.mode === 'control') {
-    await runAvtiControl(invocation.command, invocation.args)
+    await runAvtiControl(invocation.command, invocation.args, providerPatchPath)
     return
   }
   if (invocation.mode === 'interactive') {
     await renderAvtiIntro({ output: process.stdout, environment })
-    await runAvtiInteractive()
+    await runAvtiInteractive({ providerPatchPath })
     return
   }
   if (invocation.mode === 'resume') {
     await renderAvtiIntro({ output: process.stdout, environment })
-    await runAvtiInteractive({ resumeSessionId: invocation.sessionId })
+    await runAvtiInteractive({ resumeSessionId: invocation.sessionId, providerPatchPath })
     return
   }
 
-  argv.splice(2, argv.length - 2, ...invocation.args)
+  const harnessArgs = withAvtiAntigravityPatch(invocation.args, providerPatchPath)
+  argv.splice(2, argv.length - 2, ...harnessArgs)
   if (invocation.intro) {
     await renderAvtiIntro({ output: process.stdout, environment })
   }
