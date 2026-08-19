@@ -21,7 +21,8 @@
     "build": "tsdown",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "check": "yarn run build && yarn run typecheck && node lib/avti.js --version",
-    "dist:win": "yarn run build && yarn workspaces focus avti-cli --production && node scripts/package-windows.mjs"
+    "dist:win": "yarn run build && yarn workspaces focus avti-cli --production && node scripts/package-windows.mjs",
+    "dist:mac": "yarn run build && yarn workspaces focus avti-cli --production && node scripts/package-macos.mjs"
   },
   "dependencies": {
     "@deepseek-ai/cordis": "4.0.1",
