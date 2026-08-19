@@ -1,4 +1,4 @@
-/** Headless artifact smoke for the Electron-backed dsh and pnpm command entries. */
+/** Headless artifact smoke for the Electron-backed dsh, Avti, and pnpm command entries. */
 
 import { spawnSync } from 'node:child_process'
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
@@ -10,6 +10,7 @@ import { installDesktopPnpmRuntime } from '../lib/desktop-runtime-environment.js
 
 const packageRoot = new URL('../', import.meta.url)
 const desktopCli = fileURLToPath(new URL('lib/desktop-cli.js', packageRoot))
+const avtiCli = fileURLToPath(new URL('lib/avti.js', packageRoot))
 const dshAppBootPackage = fileURLToPath(new URL('node_modules/@deepseek-ai/dsh-app-boot/', packageRoot))
 const dshAtomicWritePackage = fileURLToPath(new URL('node_modules/@deepseek-ai/dsh-atomic-write/', packageRoot))
 const dshPackage = fileURLToPath(new URL('node_modules/@deepseek-ai/dsh/', packageRoot))
@@ -184,5 +185,6 @@ function runFlatProfileDshEntry() {
 }
 
 runElectronEntry('dsh', ['--expose-internals'], desktopCli, ['--version'], dshVersion)
+runElectronEntry('avti', ['--expose-internals'], avtiCli, ['--version'], dshVersion)
 runFlatProfileDshEntry()
 runPackagedPnpmShim()
