@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'cli-v*'
+    branches:
+      - 'release-cli-v*'
   workflow_dispatch:
     inputs:
       tag:
@@ -35,7 +37,11 @@ jobs:
           if [[ '${{ github.event_name }}' == 'workflow_dispatch' ]]; then
             tag='${{ inputs.tag }}'
           else
-            tag='${{ github.ref_name }}'
+            ref='${{ github.ref_name }}'
+            case "$ref" in
+              release-cli-v*) tag="${ref#release-}" ;;
+              *) tag="$ref" ;;
+            esac
           fi
           expected="cli-v${version}"
           if [[ "$tag" != "$expected" ]]; then
