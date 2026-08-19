@@ -16,16 +16,62 @@
 
 <p align="center"><strong>Русский</strong> · <a href="README.en.md">English</a> · <a href="README.zh.md">中文</a></p>
 
-<p align="center"><code>ai-agent</code> · <code>desktop</code> · <code>local-projects</code> · <code>electron</code> · <code>plugins</code> · <code>windows</code></p>
+<p align="center"><code>ai-agent</code> · <code>desktop</code> · <code>cli</code> · <code>local-projects</code> · <code>electron</code> · <code>plugins</code> · <code>windows</code></p>
 
 ## Быстрый старт
+
+### Desktop
 
 1. Установите и откройте Avti.
 2. Выберите папку локального проекта.
 3. Подключите AI-провайдера и выберите модель.
 4. Создайте новую сессию и начинайте работать.
 
-Пользователю Avti не нужны Node.js, Yarn или ручная сборка проекта — они требуются только разработчикам.
+### CLI
+
+Откройте терминал в папке проекта и запустите:
+
+```bash
+avti
+```
+
+Без аргументов Avti открывает интерактивную терминальную сессию и использует текущую папку как workspace. Контекст сохраняется между сообщениями внутри этой сессии.
+
+```text
+AVTI
+
+C:\Projects\my-app · model-name
+
+› проверь проект и исправь падающие тесты
+
+  ◜ Thinking
+  ∙···· Reading files
+  ✓ Read files
+  ·∙··· Running command
+  ✓ Ran command
+
+Исправил проблему в тестах и проверил результат.
+
+› _
+```
+
+Для одной задачи без интерактивной сессии:
+
+```bash
+avti "объясни архитектуру этого проекта"
+```
+
+Полезные команды интерактивного режима:
+
+```text
+/help   показать команды терминала
+/exit   выйти из Avti
+/quit   выйти из Avti
+```
+
+Avti CLI оставляет agent loop, tools, permissions, sessions и model calls существующему runtime; собственный terminal frontend отвечает за ввод, потоковый вывод, статусы инструментов и approval/question prompts. В pipes и CI декоративная заставка и cursor-анимации не печатаются, чтобы one-shot вывод оставался пригодным для автоматизации.
+
+Пользователю готовой сборки Avti не нужны Node.js, Yarn или ручная сборка проекта — они требуются только разработчикам.
 
 ## Установка на Windows
 
@@ -57,10 +103,11 @@ irm https://raw.githubusercontent.com/dantegolf/Avti/main/install.ps1 | iex
 ## Что умеет Avti
 
 - **Работа с локальными проектами** — workspaces, выбор папок, drag-and-drop и нативный directory picker на Windows.
+- **Desktop + CLI** — графический интерфейс и терминальный frontend над общими runtime-возможностями проекта.
 - **AI-агент и проектный контекст** — сессии, attachments, commands, tools, code runtime, permissions и sandbox-возможности.
 - **Подключаемые модели** — конфигурация AI-провайдеров и моделей через интерфейс приложения.
 - **Десктопный интерфейс** — sidebar, conversation и details surface в нативном окне с системным tray.
-- **Локальный терминал** — интегрированные terminal/shell-сервисы для работы рядом с агентом.
+- **Терминальный режим** — интерактивный `avti`, one-shot задачи, streaming-ответы, tool activity, approvals и вопросы пользователю.
 - **Profiles** — отдельные конфигурации окружения, плагинов и runtime.
 - **Plugin Market** — встроенный каталог community-плагинов с установкой, удалением и управлением.
 - **Диагностика** — локальные логи, boot health, crash evidence, экспорт диагностики и recovery-потоки.
@@ -96,7 +143,7 @@ Windows release pipeline находится в `.github/workflows/release-window
 
 ## Структура репозитория
 
-- `dsh-plugin-desktop/` — Electron-оболочка Avti и desktop-сервисы
+- `dsh-plugin-desktop/` — Electron-оболочка Avti, desktop-сервисы и Avti CLI frontend
 - `dsh-community-market/` — каталог плагинов, marketplace UI и install/uninstall flow
 - `dsh-community-fabric/` — совместимость плагинов и contracts
 - `patches/` — compatibility-патчи для зафиксированных runtime-зависимостей
