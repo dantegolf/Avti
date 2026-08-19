@@ -54,7 +54,17 @@ irm https://raw.githubusercontent.com/dantegolf/Avti/main/install-cli.ps1 | iex
 
 The installer selects only releases tagged `cli-v*`, verifies the published SHA-256, installs under `%LOCALAPPDATA%\Avti\CLI` by default and adds that directory to the user PATH.
 
-### macOS Apple Silicon
+### macOS
+
+For a user-level installation on either Apple Silicon or Intel:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dantegolf/Avti/main/install-cli.sh | sh
+```
+
+The installer detects the native architecture, selects the matching `cli-v*` artifact, verifies SHA-256, installs the runtime under `~/.local/share/avti-cli` by default and creates `~/.local/bin/avti`. If `~/.local/bin` is not already on PATH, it prints the shell configuration line to add it.
+
+#### Apple Silicon
 
 For M1/M2/M3/M4 and later Apple Silicon Macs:
 
@@ -63,7 +73,7 @@ avti-macos-arm64.tar.gz
 avti-macos-arm64.sha256
 ```
 
-After extracting:
+Manual extraction:
 
 ```bash
 tar -xzf avti-macos-arm64.tar.gz
@@ -74,7 +84,7 @@ cd avti-macos-arm64
 
 The archive contains its own arm64 Node runtime and native production dependency tree.
 
-### macOS Intel
+#### Intel
 
 For Intel Macs:
 
@@ -83,7 +93,7 @@ avti-macos-x64.tar.gz
 avti-macos-x64.sha256
 ```
 
-After extracting:
+Manual extraction:
 
 ```bash
 tar -xzf avti-macos-x64.tar.gz
