@@ -16,6 +16,10 @@ concurrency:
 
 env:
   DSH_TELEMETRY_DISABLED: '1'
+  # The branch intentionally uses mutable installs until the avti-cli workspace
+  # entry is regenerated into yarn.lock. Yarn 4 otherwise auto-enables hardened
+  # mode for public PRs and defeats the non-immutable install below.
+  YARN_ENABLE_HARDENED_MODE: '0'
 
 jobs:
   # Full product gate: build, typecheck, unit tests, and every headless smoke.
@@ -36,7 +40,7 @@ jobs:
         with:
           path: ${{ steps.yarn-cache.outputs.dir }}
           key: yarn-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('yarn.lock', '.yarnrc.yml') }}
-      # TODO: restore --immutable after the avti-cli workspace entry is regenerated into yarn.lock.
+      # TODO: restore --immutable and remove YARN_ENABLE_HARDENED_MODE after the avti-cli workspace entry is regenerated into yarn.lock.
       - run: yarn install
       - run: yarn check
 
@@ -58,7 +62,7 @@ jobs:
         with:
           path: ${{ steps.yarn-cache.outputs.dir }}
           key: yarn-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('yarn.lock', '.yarnrc.yml') }}
-      # TODO: restore --immutable after the avti-cli workspace entry is regenerated into yarn.lock.
+      # TODO: restore --immutable and remove YARN_ENABLE_HARDENED_MODE after the avti-cli workspace entry is regenerated into yarn.lock.
       - run: yarn install
       - name: Validate PowerShell bootstrap installers
         shell: pwsh
@@ -101,7 +105,7 @@ jobs:
         with:
           path: ${{ steps.yarn-cache.outputs.dir }}
           key: yarn-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('yarn.lock', '.yarnrc.yml') }}
-      # TODO: restore --immutable after the avti-cli workspace entry is regenerated into yarn.lock.
+      # TODO: restore --immutable and remove YARN_ENABLE_HARDENED_MODE after the avti-cli workspace entry is regenerated into yarn.lock.
       - run: yarn install
       - run: yarn workspace dsh-community-market check
       - run: yarn dist:mac-smoke
@@ -136,7 +140,7 @@ jobs:
         with:
           path: ${{ steps.yarn-cache.outputs.dir }}
           key: yarn-cli-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('yarn.lock', '.yarnrc.yml') }}
-      # TODO: restore --immutable after the avti-cli workspace entry is regenerated into yarn.lock.
+      # TODO: restore --immutable and remove YARN_ENABLE_HARDENED_MODE after the avti-cli workspace entry is regenerated into yarn.lock.
       - run: yarn install
       - run: yarn typecheck:cli
       # Production focus intentionally prunes the development install after typecheck.
