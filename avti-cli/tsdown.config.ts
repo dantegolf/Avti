@@ -4,6 +4,7 @@ export default defineConfig({
   name: 'avti-cli',
   entry: {
     avti: '../dsh-plugin-desktop/src/avti-cli.ts',
+    'avti-profile-boot': '../dsh-plugin-desktop/src/avti-profile-boot.ts',
   },
   outDir: 'lib',
   format: 'esm',
