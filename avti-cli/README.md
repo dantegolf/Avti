@@ -9,7 +9,22 @@ It uses the DeepSeek Harness agent runtime, sessions, tools, providers and comma
 - **Avti Desktop** — visual workspace for local projects.
 - **Avti CLI** — terminal agent for local projects.
 
-They may reuse runtime code and compatible settings formats, but installation, release artifacts and process lifecycles are independent.
+They may reuse runtime code and compatible formats, but installation, release artifacts, process lifecycles and user state are independent.
+
+Avti CLI defaults its Harness home to:
+
+```text
+~/.avti/cli
+```
+
+That directory owns CLI settings, profiles, credentials, plugins and persisted sessions. Desktop configuration is not read or modified by default.
+
+Advanced overrides:
+
+```text
+AVTI_CLI_HOME   Avti-specific CLI home override
+DSH_HOME        explicit Harness home override
+```
 
 ## Windows portable release
 
@@ -42,11 +57,11 @@ The installer selects only releases tagged `cli-v*`, verifies the published SHA-
 ```text
 avti                            interactive session in the current project
 avti <task>                     one-shot task
-avti status                     project and default model
+avti status                     project and CLI default model
 avti models [provider]          available models
-avti model [provider] <model>   show or change the shared default model
-avti sessions                   recent sessions for this project
-avti resume <session-id>        continue a persisted session
+avti model [provider] <model>   show or change the CLI default model
+avti sessions                   recent CLI sessions for this project
+avti resume <session-id>        continue a persisted CLI session
 avti doctor                     check CLI runtime and project services
 ```
 
@@ -67,6 +82,8 @@ On Windows x64:
 ```bash
 yarn dist:cli:win
 ```
+
+The packaging flow builds the CLI, focuses the Yarn workspace to production dependencies, then copies that dependency tree into the portable runtime. This preserves repository `resolutions` and `patch:` dependencies instead of reinstalling an unpatched runtime through npm.
 
 The portable staging directory is created at:
 
