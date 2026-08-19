@@ -32,6 +32,28 @@ export interface AvtiMotionOptions {
   readonly sleep?: (milliseconds: number) => Promise<void>
 }
 
+export interface AvtiActivityOptions {
+  readonly output?: AvtiTerminalOutput
+  readonly environment?: NodeJS.ProcessEnv
+  readonly frames?: readonly string[]
+  readonly intervalMs?: number
+  readonly setInterval?: (callback: () => void, milliseconds: number) => ReturnType<typeof setInterval>
+  readonly clearInterval?: (handle: ReturnType<typeof setInterval>) => void
+}
+
+export interface AvtiActivity {
+  /** Start rendering one transient status line. Calling start twice is a no-op. */
+  start(label: string): void
+  /** Change only the label; the animation phase continues. */
+  update(label: string): void
+  /** Finish the transient line and replace it with a stable success state. */
+  succeed(label?: string): void
+  /** Finish the transient line and replace it with a stable error state. */
+  fail(label: string): void
+  /** Clear the transient line without printing a completion state. */
+  stop(): void
+}
+
 const ESC = '\u001b['
 const ERASE_LINE = `${ESC}2K`
 const CURSOR_COLUMN_ZERO = '\r'
@@ -57,9 +79,82 @@ export function formatAvtiActivity(frame: string, label: string): string {
   return `  ${frame} ${label}`
 }
 
-/** Format stable completion states used by future terminal presentation adapters. */
+/** Format stable completion states used by terminal presentation adapters. */
 export function formatAvtiSuccess(label: string): string {
   return `  ✓ ${label}`
+}
+
+/** Format stable error states used by terminal presentation adapters. */
+export function formatAvtiFailure(label: string): string {
+  return `  × ${label}`
+}
+
+/**
+ * Create a tiny line animator. It owns only terminal cursor presentation: callers
+ * decide which Harness event starts, updates, succeeds, or fails the line.
+ */
+export function createAvtiActivity(options: AvtiActivityOptions = {}): AvtiActivity {
+  const output = options.output ?? process.stdout
+  const environment = options.environment ?? process.env
+  const frames = options.frames?.length ? options.frames : AVTI_ORBIT_FRAMES
+  const intervalMs = options.intervalMs ?? 90
+  const schedule = options.setInterval ?? ((callback, milliseconds) => setInterval(callback, milliseconds))
+  const cancel = options.clearInterval ?? (handle => clearInterval(handle))
+  const motion = terminalMotionEnabled(output, environment)
+
+  let label = ''
+  let frameIndex = 0
+  let timer: ReturnType<typeof setInterval> | undefined
+  let active = false
+
+  const writeFrame = (): void => {
+    if (!active) return
+    const frame = frames[frameIndex % frames.length]!
+    frameIndex += 1
+    if (motion) output.write(`${ERASE_LINE}${CURSOR_COLUMN_ZERO}${formatAvtiActivity(frame, label)}`)
+  }
+
+  const finishTransient = (): void => {
+    if (!active) return
+    active = false
+    if (timer !== undefined) {
+      cancel(timer)
+      timer = undefined
+    }
+    if (motion) output.write(`${ERASE_LINE}${CURSOR_COLUMN_ZERO}`)
+  }
+
+  return {
+    start(nextLabel: string) {
+      if (active) return
+      label = nextLabel
+      frameIndex = 0
+      active = true
+      if (!motion) {
+        output.write(`${formatAvtiActivity('·', label)}\n`)
+        return
+      }
+      writeFrame()
+      timer = schedule(writeFrame, intervalMs)
+    },
+    update(nextLabel: string) {
+      label = nextLabel
+      if (active && motion) writeFrame()
+    },
+    succeed(nextLabel = 'Done') {
+      if (!active) return
+      finishTransient()
+      output.write(`${formatAvtiSuccess(nextLabel)}\n`)
+    },
+    fail(nextLabel: string) {
+      if (!active) return
+      finishTransient()
+      output.write(`${formatAvtiFailure(nextLabel)}\n`)
+    },
+    stop() {
+      finishTransient()
+    },
+  }
 }
 
 /**
