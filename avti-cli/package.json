@@ -1,6 +1,6 @@
 {
   "name": "avti-cli",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "description": "Standalone Avti terminal AI agent for local projects",
   "license": "MIT",
