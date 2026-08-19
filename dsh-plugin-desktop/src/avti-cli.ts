@@ -2,6 +2,7 @@
 
 import { readFileSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { runAvtiInteractive } from './avti-interactive.ts'
 import { packagedDependencyPath } from './packaged-runtime-path.ts'
 import { renderAvtiIntro } from './avti-terminal-style.ts'
 
@@ -13,7 +14,8 @@ const DSH_ENTRY_URL = pathToFileURL(
 export const AVTI_CLI_HELP = `AVTI
 
 Usage:
-  avti <task>                     run one task in the current project
+  avti                            start an interactive session in this project
+  avti <task>                     run one task and exit
   avti --profile <name> [args]    boot an Avti profile
   avti web [args]                 boot the web profile
   avti plugin [args]              manage profile plugins
@@ -22,7 +24,12 @@ Options:
   -h, --help                      show Avti CLI help
   -V, --version                   show Avti version
 
+Interactive commands:
+  /help                           show terminal commands
+  /exit                           leave Avti
+
 Examples:
+  avti
   avti "run the tests and fix failures"
   avti --profile headless "explain this project"
   avti web
@@ -35,7 +42,7 @@ export interface AvtiHarnessInvocation {
 }
 
 export interface AvtiLocalInvocation {
-  readonly mode: 'help' | 'version'
+  readonly mode: 'interactive' | 'help' | 'version'
 }
 
 export type AvtiInvocation = AvtiHarnessInvocation | AvtiLocalInvocation
@@ -70,7 +77,7 @@ function isExplicitHarnessFrontDoor(first: string): boolean {
  * launcher modes continue through unchanged.
  */
 export function resolveAvtiInvocation(args: readonly string[]): AvtiInvocation {
-  if (args.length === 0) return { mode: 'help' }
+  if (args.length === 0) return { mode: 'interactive' }
   if (args.length === 1 && (args[0] === '-h' || args[0] === '--help')) return { mode: 'help' }
   if (args.length === 1 && (args[0] === '-V' || args[0] === '--version')) return { mode: 'version' }
 
@@ -90,9 +97,9 @@ export function resolveAvtiInvocation(args: readonly string[]): AvtiInvocation {
 }
 
 /**
- * Launch the existing Harness CLI. Avti owns only the outer brand grammar and
- * startup presentation; runtime behavior, tools, permissions, sessions and agent
- * execution remain upstream.
+ * Launch Avti over the existing Harness runtime. Avti owns only the outer grammar,
+ * interactive terminal frontend and presentation; tools, permissions, sessions,
+ * model calls and agent execution remain upstream.
  */
 export async function runAvtiCli(
   environment: NodeJS.ProcessEnv = process.env,
@@ -108,6 +115,11 @@ export async function runAvtiCli(
   }
   if (invocation.mode === 'version') {
     process.stdout.write(`${packageVersion()}\n`)
+    return
+  }
+  if (invocation.mode === 'interactive') {
+    await renderAvtiIntro({ output: process.stdout, environment })
+    await runAvtiInteractive()
     return
   }
 
