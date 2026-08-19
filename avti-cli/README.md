@@ -26,9 +26,11 @@ AVTI_CLI_HOME   Avti-specific CLI home override
 DSH_HOME        explicit Harness home override
 ```
 
-## Windows portable release
+## Portable releases
 
-The Windows x64 release is published as:
+One `cli-v*` GitHub Release publishes all supported CLI platforms from the same Avti CLI version.
+
+### Windows x64
 
 ```text
 avti-windows-x64.zip
@@ -51,6 +53,48 @@ irm https://raw.githubusercontent.com/dantegolf/Avti/main/install-cli.ps1 | iex
 ```
 
 The installer selects only releases tagged `cli-v*`, verifies the published SHA-256, installs under `%LOCALAPPDATA%\Avti\CLI` by default and adds that directory to the user PATH.
+
+### macOS Apple Silicon
+
+For M1/M2/M3/M4 and later Apple Silicon Macs:
+
+```text
+avti-macos-arm64.tar.gz
+avti-macos-arm64.sha256
+```
+
+After extracting:
+
+```bash
+tar -xzf avti-macos-arm64.tar.gz
+cd avti-macos-arm64
+./avti --version
+./avti
+```
+
+The archive contains its own arm64 Node runtime and native production dependency tree.
+
+### macOS Intel
+
+For Intel Macs:
+
+```text
+avti-macos-x64.tar.gz
+avti-macos-x64.sha256
+```
+
+After extracting:
+
+```bash
+tar -xzf avti-macos-x64.tar.gz
+cd avti-macos-x64
+./avti --version
+./avti
+```
+
+The Intel archive is built on a native x64 macOS runner so native Harness dependencies match the target architecture.
+
+The macOS releases are intentionally architecture-specific instead of pretending to be one universal archive: this keeps Node and any native npm dependencies aligned with the machine they run on.
 
 ## Usage
 
@@ -83,13 +127,23 @@ On Windows x64:
 yarn dist:cli:win
 ```
 
+On a native macOS arm64 or x64 machine:
+
+```bash
+yarn dist:cli:mac
+```
+
 The packaging flow builds the CLI, focuses the Yarn workspace to production dependencies, then copies that dependency tree into the portable runtime. This preserves repository `resolutions` and `patch:` dependencies instead of reinstalling an unpatched runtime through npm.
 
-The portable staging directory is created at:
+Portable staging directories are created at:
 
 ```text
 avti-cli/dist/avti-windows-x64/
+avti-cli/dist/avti-macos-arm64/
+avti-cli/dist/avti-macos-x64/
 ```
+
+Only the directory matching the current native architecture is produced by one macOS packaging run.
 
 ## Release versioning
 
@@ -100,6 +154,8 @@ cli-v0.1.0
 ```
 
 Desktop tags remain `vX.Y.Z`. The versions are intentionally independent.
+
+The CLI release workflow builds three artifacts in parallel: Windows x64, macOS arm64 and macOS x64. All three are published into the same `cli-v*` GitHub Release with matching SHA-256 manifests.
 
 ## Source layout
 
