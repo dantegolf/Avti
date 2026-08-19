@@ -23,6 +23,11 @@ describe('Avti CLI control routing', () => {
       command: 'sessions',
       args: [],
     })
+    expect(resolveAvtiInvocation(['doctor'])).toEqual({
+      mode: 'control',
+      command: 'doctor',
+      args: [],
+    })
   })
 
   it('still treats ordinary text as a Harness one-shot task', () => {
@@ -38,6 +43,7 @@ describe('Avti CLI control routing', () => {
     expect(AVTI_CLI_HELP).toContain('avti models [provider]')
     expect(AVTI_CLI_HELP).toContain('avti model [provider] <model>')
     expect(AVTI_CLI_HELP).toContain('avti sessions')
+    expect(AVTI_CLI_HELP).toContain('avti doctor')
     expect(AVTI_CLI_HELP).not.toContain('Usage: dsh')
   })
 })
