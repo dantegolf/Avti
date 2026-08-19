@@ -19,6 +19,7 @@ export const AVTI_CLI_HELP = `AVTI
 Usage:
   avti                            start an interactive session in this project
   avti <task>                     run one task and exit
+  avti resume <session-id>        continue a saved session from this project
   avti status                     show project and default model
   avti models [provider]          list available models
   avti model [provider] <model>   show or change the shared default model
@@ -34,15 +35,20 @@ Options:
 
 Interactive commands:
   /help                           show terminal commands
+  /status                         show project, model and session
+  /models [provider]              list available models
+  /model [provider] <model>       show or change model for following turns
+  /sessions                       show recent project sessions
   /exit                           leave Avti
 
 Examples:
   avti
   avti "run the tests and fix failures"
+  avti sessions
+  avti resume avti-<session-id>
   avti status
   avti models
   avti model deepseek-official deepseek-v4-flash
-  avti sessions
   avti doctor
   avti --profile headless "explain this project"
   avti web
@@ -58,13 +64,18 @@ export interface AvtiLocalInvocation {
   readonly mode: 'interactive' | 'help' | 'version'
 }
 
+export interface AvtiResumeInvocation {
+  readonly mode: 'resume'
+  readonly sessionId: string
+}
+
 export interface AvtiControlInvocation {
   readonly mode: 'control'
   readonly command: string
   readonly args: string[]
 }
 
-export type AvtiInvocation = AvtiHarnessInvocation | AvtiLocalInvocation | AvtiControlInvocation
+export type AvtiInvocation = AvtiHarnessInvocation | AvtiLocalInvocation | AvtiResumeInvocation | AvtiControlInvocation
 
 /** Remove Electron Node mode before Harness creates child processes. */
 export function clearAvtiElectronRunAsNode(environment: NodeJS.ProcessEnv): void {
@@ -101,6 +112,13 @@ export function resolveAvtiInvocation(args: readonly string[]): AvtiInvocation {
   if (args.length === 1 && (args[0] === '-V' || args[0] === '--version')) return { mode: 'version' }
 
   const first = args[0]!
+  if (first === 'resume') {
+    const sessionId = args[1]
+    if (sessionId === undefined || sessionId.trim() === '') {
+      return { mode: 'help' }
+    }
+    return { mode: 'resume', sessionId }
+  }
   if (AVTI_CONTROL_COMMANDS.has(first)) {
     return { mode: 'control', command: first, args: args.slice(1) }
   }
@@ -146,6 +164,11 @@ export async function runAvtiCli(
   if (invocation.mode === 'interactive') {
     await renderAvtiIntro({ output: process.stdout, environment })
     await runAvtiInteractive()
+    return
+  }
+  if (invocation.mode === 'resume') {
+    await renderAvtiIntro({ output: process.stdout, environment })
+    await runAvtiInteractive({ resumeSessionId: invocation.sessionId })
     return
   }
 
