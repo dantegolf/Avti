@@ -14,9 +14,9 @@ export const AVTI_CLI_HELP = `AVTI
 
 Usage:
   avti <task>                     run one task in the current project
-  avti --profile <name> [args]    boot an existing Harness profile
+  avti --profile <name> [args]    boot an Avti profile
   avti web [args]                 boot the web profile
-  avti plugin [args]              manage Harness profile plugins
+  avti plugin [args]              manage profile plugins
 
 Options:
   -h, --help                      show Avti CLI help
@@ -126,7 +126,7 @@ function isDirectExecution(): boolean {
 if (isDirectExecution()) {
   void runAvtiCli().catch((cause: unknown) => {
     process.stderr.write(
-      `avti: failed to start Harness CLI: ${cause instanceof Error ? cause.stack ?? cause.message : String(cause)}\n`,
+      `avti: failed to start: ${cause instanceof Error ? cause.stack ?? cause.message : String(cause)}\n`,
     )
     process.exitCode = 1
   })
