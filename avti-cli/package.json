@@ -20,7 +20,8 @@
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "check": "yarn run build && yarn run typecheck && node lib/avti.js --version"
+    "check": "yarn run build && yarn run typecheck && node lib/avti.js --version",
+    "dist:win": "yarn run build && node scripts/package-windows.mjs"
   },
   "dependencies": {
     "@deepseek-ai/cordis": "4.0.1",
