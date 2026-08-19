@@ -12,7 +12,7 @@ const DSH_ENTRY_URL = pathToFileURL(
   packagedDependencyPath(import.meta.url, '@deepseek-ai/dsh/lib/bin.js'),
 ).href
 
-const AVTI_CONTROL_COMMANDS = new Set(['status', 'models', 'model', 'sessions'])
+const AVTI_CONTROL_COMMANDS = new Set(['status', 'models', 'model', 'sessions', 'doctor'])
 
 export const AVTI_CLI_HELP = `AVTI
 
@@ -23,6 +23,7 @@ Usage:
   avti models [provider]          list available models
   avti model [provider] <model>   show or change the shared default model
   avti sessions                   list recent sessions for this project
+  avti doctor                     check workspace and Harness services
   avti --profile <name> [args]    boot an Avti profile
   avti web [args]                 boot the web profile
   avti plugin [args]              manage profile plugins
@@ -42,6 +43,7 @@ Examples:
   avti models
   avti model deepseek-official deepseek-v4-flash
   avti sessions
+  avti doctor
   avti --profile headless "explain this project"
   avti web
 `
