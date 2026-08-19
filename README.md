@@ -52,11 +52,17 @@ CLI устанавливается отдельно от Desktop. На Windows:
 irm https://raw.githubusercontent.com/dantegolf/Avti/main/install-cli.ps1 | iex
 ```
 
-Установщик CLI выбирает только releases с тегами `cli-v*`, проверяет SHA-256, устанавливает portable runtime в `%LOCALAPPDATA%\Avti\CLI` и добавляет эту папку в пользовательский PATH.
+Установщик Windows выбирает только releases с тегами `cli-v*`, проверяет SHA-256, устанавливает portable runtime в `%LOCALAPPDATA%\Avti\CLI` и добавляет эту папку в пользовательский PATH.
 
-На macOS скачайте подходящий archive из CLI release: `avti-macos-arm64.tar.gz` для Apple Silicon или `avti-macos-x64.tar.gz` для Intel.
+На macOS:
 
-Откройте терминал в папке проекта и запустите:
+```bash
+curl -fsSL https://raw.githubusercontent.com/dantegolf/Avti/main/install-cli.sh | sh
+```
+
+macOS installer сам определяет Apple Silicon (`arm64`) или Intel (`x64`), выбирает подходящий `cli-v*` artifact, проверяет SHA-256 и устанавливает CLI в `~/.local/share/avti-cli` с командой `~/.local/bin/avti`.
+
+Откройте новый терминал в папке проекта и запустите:
 
 ```bash
 avti
@@ -182,7 +188,17 @@ CLI bootstrap:
 irm https://raw.githubusercontent.com/dantegolf/Avti/main/install-cli.ps1 | iex
 ```
 
-### Avti CLI — macOS Apple Silicon
+### Avti CLI — macOS
+
+Быстрая установка для Apple Silicon и Intel одной командой:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dantegolf/Avti/main/install-cli.sh | sh
+```
+
+Installer определяет архитектуру через `uname -m`, скачивает соответствующий release artifact, проверяет опубликованный SHA-256 и создаёт команду `~/.local/bin/avti`. Если `~/.local/bin` ещё не находится в `PATH`, installer напечатает готовую строку для добавления в shell config.
+
+#### Apple Silicon
 
 Для M1/M2/M3/M4 и более новых Apple Silicon Mac:
 
@@ -191,13 +207,15 @@ avti-macos-arm64.tar.gz
 avti-macos-arm64.sha256
 ```
 
+Ручная установка:
+
 ```bash
 tar -xzf avti-macos-arm64.tar.gz
 cd avti-macos-arm64
 ./avti
 ```
 
-### Avti CLI — macOS Intel
+#### Intel
 
 Для Intel Mac:
 
@@ -205,6 +223,8 @@ cd avti-macos-arm64
 avti-macos-x64.tar.gz
 avti-macos-x64.sha256
 ```
+
+Ручная установка:
 
 ```bash
 tar -xzf avti-macos-x64.tar.gz
@@ -318,6 +338,7 @@ version: avti-cli/package.json
 - `patches/` — compatibility-патчи для зафиксированных runtime-зависимостей
 - `install.ps1` — bootstrap installer для Desktop
 - `install-cli.ps1` — независимый Windows bootstrap installer для CLI
+- `install-cli.sh` — независимый macOS bootstrap installer для CLI
 
 На текущем этапе CLI package переиспользует часть terminal frontend source из `dsh-plugin-desktop/src/avti-*.ts` **только во время сборки**. Готовый CLI artifact не зависит от Desktop или Electron. Следующий внутренний cleanup — вынести этот source seam в нейтральный shared package, не меняя пользовательскую границу продуктов.
 
