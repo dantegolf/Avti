@@ -16,7 +16,7 @@
 
 <p align="center"><strong>Русский</strong> · <a href="README.en.md">English</a> · <a href="README.zh.md">中文</a></p>
 
-<p align="center"><code>ai-agent</code> · <code>desktop</code> · <code>cli</code> · <code>local-projects</code> · <code>electron</code> · <code>plugins</code> · <code>windows</code></p>
+<p align="center"><code>ai-agent</code> · <code>desktop</code> · <code>cli</code> · <code>local-projects</code> · <code>electron</code> · <code>plugins</code> · <code>windows</code> · <code>macos</code></p>
 
 ## Два самостоятельных продукта
 
@@ -32,13 +32,13 @@ Avti Desktop и Avti CLI развиваются под одним брендом
 
 ### Avti Desktop
 
-1. Скачайте Windows installer из [Releases](https://github.com/dantegolf/Avti/releases).
+1. Скачайте installer из [Releases](https://github.com/dantegolf/Avti/releases).
 2. Установите и откройте Avti Desktop.
 3. Выберите папку локального проекта.
 4. Подключите AI-провайдера и выберите модель.
 5. Создайте новую сессию и начинайте работать.
 
-Установка Desktop из PowerShell:
+Windows Desktop из PowerShell:
 
 ```powershell
 irm https://raw.githubusercontent.com/dantegolf/Avti/main/install.ps1 | iex
@@ -46,7 +46,7 @@ irm https://raw.githubusercontent.com/dantegolf/Avti/main/install.ps1 | iex
 
 ### Avti CLI
 
-CLI устанавливается отдельно от Desktop:
+CLI устанавливается отдельно от Desktop. На Windows:
 
 ```powershell
 irm https://raw.githubusercontent.com/dantegolf/Avti/main/install-cli.ps1 | iex
@@ -54,7 +54,9 @@ irm https://raw.githubusercontent.com/dantegolf/Avti/main/install-cli.ps1 | iex
 
 Установщик CLI выбирает только releases с тегами `cli-v*`, проверяет SHA-256, устанавливает portable runtime в `%LOCALAPPDATA%\Avti\CLI` и добавляет эту папку в пользовательский PATH.
 
-Откройте новый терминал в папке проекта и запустите:
+На macOS скачайте подходящий archive из CLI release: `avti-macos-arm64.tar.gz` для Apple Silicon или `avti-macos-x64.tar.gz` для Intel.
+
+Откройте терминал в папке проекта и запустите:
 
 ```bash
 avti
@@ -137,11 +139,18 @@ $env:AVTI_CLI_HOME = 'D:\AvtiCli'
 avti
 ```
 
+или на macOS/Linux shell:
+
+```bash
+export AVTI_CLI_HOME="$HOME/.avti/cli-custom"
+avti
+```
+
 `DSH_HOME` остаётся доступным как advanced Harness override.
 
-## Установка на Windows
+## Установка и portable artifacts
 
-### Desktop
+### Windows Desktop
 
 Desktop release использует tag вида `v2.0.1` и artifact:
 
@@ -156,7 +165,7 @@ Desktop bootstrap:
 irm https://raw.githubusercontent.com/dantegolf/Avti/main/install.ps1 | iex
 ```
 
-### CLI
+### Avti CLI — Windows x64
 
 CLI release использует независимый tag вида `cli-v0.1.0` и artifacts:
 
@@ -173,7 +182,39 @@ CLI bootstrap:
 irm https://raw.githubusercontent.com/dantegolf/Avti/main/install-cli.ps1 | iex
 ```
 
-Windows-сборки Desktop и CLI пока не подписаны Authenticode, поэтому SmartScreen может показывать предупреждение до подключения code signing.
+### Avti CLI — macOS Apple Silicon
+
+Для M1/M2/M3/M4 и более новых Apple Silicon Mac:
+
+```text
+avti-macos-arm64.tar.gz
+avti-macos-arm64.sha256
+```
+
+```bash
+tar -xzf avti-macos-arm64.tar.gz
+cd avti-macos-arm64
+./avti
+```
+
+### Avti CLI — macOS Intel
+
+Для Intel Mac:
+
+```text
+avti-macos-x64.tar.gz
+avti-macos-x64.sha256
+```
+
+```bash
+tar -xzf avti-macos-x64.tar.gz
+cd avti-macos-x64
+./avti
+```
+
+macOS CLI artifacts собираются нативно под каждую архитектуру, чтобы Node runtime и native npm dependencies соответствовали машине пользователя.
+
+Windows CLI пока не подписан Authenticode. macOS CLI пока не подписан и не notarized; signing/notarization будет подключаться отдельно от Desktop release signing.
 
 ## Что умеет Avti
 
@@ -198,7 +239,7 @@ Windows-сборки Desktop и CLI пока не подписаны Authenticod
 - CLI-only model settings;
 - persisted CLI sessions и resume;
 - `status`, `models`, `model`, `sessions`, `doctor`;
-- отдельный portable Windows runtime.
+- отдельные portable runtimes для Windows x64, macOS arm64 и macOS x64.
 
 ## Для разработчиков
 
@@ -239,7 +280,10 @@ yarn build:cli
 yarn typecheck:cli
 yarn check:cli
 yarn dist:cli:win
+yarn dist:cli:mac
 ```
+
+`dist:cli:mac` создаёт artifact только для архитектуры текущей macOS-машины. Release CI отдельно запускает его на arm64 и Intel runners.
 
 ## Releases
 
@@ -263,17 +307,17 @@ version: avti-cli/package.json
  tag:    cli-v0.1.0
 ```
 
-Версии Desktop и CLI не обязаны совпадать.
+Один `cli-v*` release содержит Windows x64, macOS arm64 и macOS x64 artifacts с отдельными SHA-256 manifests. Версии Desktop и CLI не обязаны совпадать.
 
 ## Структура репозитория
 
-- `avti-cli/` — standalone CLI package, packaging и CLI release boundary
+- `avti-cli/` — standalone CLI package, cross-platform packaging и CLI release boundary
 - `dsh-plugin-desktop/` — Electron-оболочка Avti Desktop и desktop-сервисы
 - `dsh-community-market/` — каталог плагинов, marketplace UI и install/uninstall flow
 - `dsh-community-fabric/` — совместимость плагинов и contracts
 - `patches/` — compatibility-патчи для зафиксированных runtime-зависимостей
 - `install.ps1` — bootstrap installer для Desktop
-- `install-cli.ps1` — независимый bootstrap installer для CLI
+- `install-cli.ps1` — независимый Windows bootstrap installer для CLI
 
 На текущем этапе CLI package переиспользует часть terminal frontend source из `dsh-plugin-desktop/src/avti-*.ts` **только во время сборки**. Готовый CLI artifact не зависит от Desktop или Electron. Следующий внутренний cleanup — вынести этот source seam в нейтральный shared package, не меняя пользовательскую границу продуктов.
 
@@ -281,11 +325,11 @@ version: avti-cli/package.json
 
 Avti использует runtime-пакеты DeepSeek Harness и другие open-source компоненты. Эти зависимости остаются явно указаны в package metadata и распространяются с собственными license files в production dependency tree.
 
-Лицензия проекта: [`LICENSE`](LICENSE). Сторонние компоненты Desktop: [`dsh-plugin-desktop/THIRD_PARTY_NOTICES.md`](dsh-plugin-desktop/THIRD_PARTY_NOTICES.md).
+Лицензия проекта: [`LICENSE`](LICENSE). Сторонние компоненты Desktop: [`dsh-plugin-desktop/THIRD_PARTY_NOTICES.md`](dsh-plugin-desktop/THIRD_PARTY_NOTICES.md). Сторонние компоненты CLI: [`avti-cli/THIRD_PARTY_NOTICES.md`](avti-cli/THIRD_PARTY_NOTICES.md).
 
 ## Текущие ограничения
 
-- Desktop и CLI пока публикуются без Authenticode-подписи.
-- CLI portable release пока Windows x64 only.
+- Desktop и CLI пока публикуются без production code signing.
+- macOS CLI пока не notarized.
 - CLI source seam ещё физически находится рядом с Desktop source и должен быть вынесен в нейтральный package после стабилизации build boundary.
 - Automatic update для Desktop и CLI не включён.
