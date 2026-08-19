@@ -140,14 +140,16 @@ export function createAvtiActivity(options: AvtiActivityOptions = {}): AvtiActiv
       timer = schedule(writeFrame, intervalMs)
     },
     update(nextLabel: string) {
+      const changed = nextLabel !== label
       label = nextLabel
-      if (active && motion) writeFrame()
+      if (!active) return
+      if (motion) writeFrame()
+      else if (changed) output.write(`${formatAvtiActivity('·', label)}\n`)
     },
     setFrames(nextFrames: readonly string[]) {
       if (nextFrames.length === 0) return
       frames = nextFrames
       frameIndex = 0
-      if (active && motion) writeFrame()
     },
     succeed(nextLabel = 'Done') {
       if (!active) return
