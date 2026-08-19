@@ -69,9 +69,10 @@ export interface AvtiHarnessInvocation {
   readonly intro: boolean
 }
 
-export interface AvtiLocalInvocation {
-  readonly mode: 'interactive' | 'help' | 'version'
-}
+export type AvtiLocalInvocation =
+  | { readonly mode: 'interactive' }
+  | { readonly mode: 'help' }
+  | { readonly mode: 'version' }
 
 export interface AvtiResumeInvocation {
   readonly mode: 'resume'
