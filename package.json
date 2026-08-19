@@ -2,13 +2,14 @@
   "name": "deepseek-harness-desktop",
   "version": "2.0.1",
   "private": true,
-  "description": "Avti desktop workspace",
+  "description": "Avti desktop and CLI workspace",
   "license": "MIT",
   "packageManager": "yarn@4.18.0",
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
   },
   "workspaces": [
+    "avti-cli",
     "dsh-plugin-desktop",
     "dsh-community-fabric",
     "dsh-community-market"
@@ -51,17 +52,22 @@
     }
   },
   "scripts": {
-    "build": "yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop build",
-    "typecheck": "yarn workspace dsh-plugin-desktop typecheck && yarn workspace dsh-community-market typecheck",
+    "build": "yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop build && yarn workspace avti-cli build",
+    "build:desktop": "yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop build",
+    "build:cli": "yarn workspace avti-cli build",
+    "typecheck": "yarn workspace dsh-plugin-desktop typecheck && yarn workspace dsh-community-market typecheck && yarn workspace avti-cli typecheck",
+    "typecheck:cli": "yarn workspace avti-cli typecheck",
     "test": "yarn workspace dsh-plugin-desktop test && yarn workspace dsh-community-market test",
     "check:layout": "node scripts/verify-layout.mjs",
-    "check": "yarn check:layout && yarn workspace dsh-community-fabric check && yarn workspace dsh-community-market check && yarn workspace dsh-plugin-desktop check",
+    "check": "yarn check:layout && yarn workspace dsh-community-fabric check && yarn workspace dsh-community-market check && yarn workspace dsh-plugin-desktop check && yarn workspace avti-cli check",
+    "check:cli": "yarn workspace avti-cli check",
     "dev": "yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dev",
     "start": "yarn workspace dsh-plugin-desktop start",
     "package:dir": "yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop package:dir",
     "dist:mac": "yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:mac",
     "dist:mac-smoke": "yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:mac-smoke",
     "dist:win": "yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win",
-    "dist:win-portable": "yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win-portable"
+    "dist:win-portable": "yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win-portable",
+    "dist:cli:win": "yarn workspace avti-cli dist:win"
   }
 }
