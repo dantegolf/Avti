@@ -28,6 +28,8 @@ import {
   AVTI_ORBIT_FRAMES,
   AVTI_PULSE_FRAMES,
   createAvtiActivity,
+  formatAvtiFailure,
+  formatAvtiSuccess,
   type AvtiActivity,
 } from './avti-terminal-style.ts'
 import {
@@ -255,10 +257,16 @@ function renderSessionEvent(
     const callId = String(event.data.message.source.callId)
     const presentation = state.tools.get(callId)
     if (presentation !== undefined) {
-      if (event.data.error === undefined) activity.succeed(presentation.success)
-      else activity.fail(presentation.failure)
+      activity.stop()
+      const completion = event.data.error === undefined
+        ? formatAvtiSuccess(presentation.success)
+        : formatAvtiFailure(presentation.failure)
+      process.stdout.write(`${completion}\n`)
       state.tools.delete(callId)
       state.endsWithNewline = true
+
+      const remaining = state.tools.values().next().value as AvtiToolPresentation | undefined
+      if (remaining !== undefined) showToolActivity(activity, remaining, state)
     }
     return
   }
