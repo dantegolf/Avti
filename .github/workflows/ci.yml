@@ -148,7 +148,7 @@ jobs:
       - name: Upload standalone macOS CLI test build
         uses: actions/upload-artifact@v4
         with:
-          name: avti-cli-macos-${{ matrix.arch }}-0.1.1
+          name: avti-cli-macos-${{ matrix.arch }}-0.1.2
           path: avti-cli/dist/avti-macos-${{ matrix.arch }}/
           if-no-files-found: error
           retention-days: 7
