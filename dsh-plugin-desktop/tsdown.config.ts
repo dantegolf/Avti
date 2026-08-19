@@ -44,7 +44,6 @@ export default defineConfig([
     name: `${PACKAGE_NAME}/bin`,
     entry: {
       bin: 'src/bin.ts',
-      avti: 'src/avti-cli.ts',
     },
     outDir: 'lib',
     format: 'esm',
