@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { ensurePiAiModelManifest } from './repair-pi-ai-runtime.mjs'
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const repoRoot = resolve(packageRoot, '..')
@@ -51,6 +52,8 @@ if (existsSync(join(packagedNodeModules, 'dsh-plugin-desktop'))) {
   throw new Error('Standalone Avti CLI runtime unexpectedly contains dsh-plugin-desktop')
 }
 
+ensurePiAiModelManifest(packagedNodeModules)
+
 cpSync(libRoot, join(appRoot, 'lib'), { recursive: true, force: true })
 copyFileSync(join(packageRoot, 'package.json'), join(appRoot, 'package.json'))
 
@@ -61,7 +64,8 @@ writeFileSync(
   "export { runProfile } from '../../../../lib/avti-profile-boot.js'\n",
 )
 
-copyFileSync(process.execPath, join(outputRoot, 'node.exe'))
+const nodePath = join(outputRoot, 'node.exe')
+copyFileSync(process.execPath, nodePath)
 writeFileSync(join(outputRoot, 'avti.cmd'), [
   '@echo off',
   'setlocal',
@@ -76,12 +80,35 @@ const readme = join(packageRoot, 'README.md')
 if (existsSync(readme)) copyFileSync(readme, join(outputRoot, 'README.md'))
 writeFileSync(join(outputRoot, 'VERSION'), `${packageJson.version}\n`)
 
-const smoke = execFileSync(join(outputRoot, 'node.exe'), [
+const smoke = execFileSync(nodePath, [
   join(appRoot, 'lib', 'avti.js'),
   '--version',
 ], { cwd: outputRoot, encoding: 'utf8' }).trim()
 if (smoke !== packageJson.version) {
   throw new Error(`packaged Avti CLI reported ${JSON.stringify(smoke)} instead of ${packageJson.version}`)
+}
+
+const smokeHome = join(outputRoot, '.smoke-home')
+rmSync(smokeHome, { recursive: true, force: true })
+try {
+  const modelsSmoke = execFileSync(nodePath, [
+    join(appRoot, 'lib', 'avti.js'),
+    'models',
+    'antigravity',
+  ], {
+    cwd: outputRoot,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      AVTI_CLI_HOME: smokeHome,
+      AVTI_NO_MOTION: '1',
+    },
+  })
+  if (!modelsSmoke.includes('gemini-3.7-flash-high')) {
+    throw new Error('packaged Avti CLI model smoke did not expose the Antigravity catalog')
+  }
+} finally {
+  rmSync(smokeHome, { recursive: true, force: true })
 }
 
 process.stdout.write(`Standalone Avti CLI staged at ${outputRoot}\n`)
