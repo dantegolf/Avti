@@ -1,0 +1,130 @@
+name: Release Avti CLI Windows
+
+on:
+  push:
+    tags:
+      - 'cli-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'CLI release tag, for example cli-v0.1.0'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  windows-cli:
+    name: Build standalone Windows CLI
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Enable Yarn
+        shell: pwsh
+        run: |
+          corepack enable
+          corepack prepare yarn@4.18.0 --activate
+          yarn --version
+
+      - name: Install dependencies
+        shell: pwsh
+        run: yarn install --immutable
+
+      - name: Resolve CLI release metadata
+        id: meta
+        shell: pwsh
+        run: |
+          $version = node -p "require('./avti-cli/package.json').version"
+          if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+            $tag = '${{ inputs.tag }}'
+          } else {
+            $tag = '${{ github.ref_name }}'
+          }
+
+          $expected = "cli-v$version"
+          if ($tag -ne $expected) {
+            throw "CLI release tag $tag does not match avti-cli version $version (expected $expected)"
+          }
+
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Typecheck standalone CLI
+        shell: pwsh
+        run: yarn typecheck:cli
+
+      - name: Build standalone CLI runtime
+        shell: pwsh
+        run: yarn dist:cli:win
+
+      - name: Create portable ZIP and checksum
+        id: artifact
+        shell: pwsh
+        run: |
+          $source = Resolve-Path 'avti-cli/dist/avti-windows-x64'
+          $zip = Join-Path (Split-Path $source -Parent) 'avti-windows-x64.zip'
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path (Join-Path $source '*') -DestinationPath $zip -CompressionLevel Optimal
+
+          $hash = (Get-FileHash -Path $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          $manifest = Join-Path (Split-Path $zip -Parent) 'avti-windows-x64.sha256'
+          "$hash  $(Split-Path $zip -Leaf)" | Set-Content -Path $manifest -Encoding ascii
+
+          "zip=$zip" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "checksum=$manifest" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Smoke-test extracted portable CLI
+        shell: pwsh
+        run: |
+          $smoke = Join-Path $env:RUNNER_TEMP 'avti-cli-smoke'
+          if (Test-Path $smoke) { Remove-Item $smoke -Recurse -Force }
+          Expand-Archive -Path '${{ steps.artifact.outputs.zip }}' -DestinationPath $smoke
+          $reported = & (Join-Path $smoke 'avti.cmd') --version
+          $expected = '${{ steps.meta.outputs.version }}'
+          if ($reported.Trim() -ne $expected) {
+            throw "Portable CLI reported $reported instead of $expected"
+          }
+
+      - name: Publish CLI GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.meta.outputs.version }}
+          RELEASE_TARGET: ${{ github.sha }}
+          CLI_ZIP: ${{ steps.artifact.outputs.zip }}
+          CLI_CHECKSUM: ${{ steps.artifact.outputs.checksum }}
+        run: |
+          gh release view $env:RELEASE_TAG 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:RELEASE_TAG $env:CLI_ZIP $env:CLI_CHECKSUM --clobber
+            exit $LASTEXITCODE
+          }
+
+          $notes = @"
+          ## Avti CLI $env:RELEASE_VERSION
+
+          Standalone Windows x64 terminal agent. This archive includes its own Node runtime and does not require Avti Desktop, Node.js or Yarn to be installed.
+
+          Extract the archive and run `avti.cmd` from the extracted directory. Add that directory to PATH if you want to call `avti` globally.
+
+          > Current CLI builds are unsigned. Code signing will be added separately from Desktop signing.
+          "@
+
+          gh release create $env:RELEASE_TAG `
+            $env:CLI_ZIP `
+            $env:CLI_CHECKSUM `
+            --target $env:RELEASE_TARGET `
+            --title "Avti CLI $env:RELEASE_VERSION" `
+            --notes $notes
