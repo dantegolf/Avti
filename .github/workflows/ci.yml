@@ -45,7 +45,7 @@ jobs:
       - run: yarn check
 
   # Windows-only logic and unsigned Desktop/CLI artifacts on a real Windows runner.
-  windows-products:
+  desktop-windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
