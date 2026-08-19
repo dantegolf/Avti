@@ -2,10 +2,10 @@
 
 import type { WriteStream } from 'node:tty'
 
-/** Quiet orbital motion used for transient Avti activity states. */
+/** Quiet orbital motion used for transient Avti thinking states. */
 export const AVTI_ORBIT_FRAMES = ['◜', '◝', '◞', '◟'] as const
 
-/** Horizontal pulse for longer-running tool activity. */
+/** Horizontal pulse for concrete tool activity. */
 export const AVTI_PULSE_FRAMES = [
   '∙····',
   '·∙···',
@@ -46,6 +46,8 @@ export interface AvtiActivity {
   start(label: string): void
   /** Change only the label; the animation phase continues. */
   update(label: string): void
+  /** Switch motion vocabulary without changing the event represented by the line. */
+  setFrames(frames: readonly string[]): void
   /** Finish the transient line and replace it with a stable success state. */
   succeed(label?: string): void
   /** Finish the transient line and replace it with a stable error state. */
@@ -96,7 +98,7 @@ export function formatAvtiFailure(label: string): string {
 export function createAvtiActivity(options: AvtiActivityOptions = {}): AvtiActivity {
   const output = options.output ?? process.stdout
   const environment = options.environment ?? process.env
-  const frames = options.frames?.length ? options.frames : AVTI_ORBIT_FRAMES
+  let frames = options.frames?.length ? options.frames : AVTI_ORBIT_FRAMES
   const intervalMs = options.intervalMs ?? 90
   const schedule = options.setInterval ?? ((callback, milliseconds) => setInterval(callback, milliseconds))
   const cancel = options.clearInterval ?? (handle => clearInterval(handle))
@@ -139,6 +141,12 @@ export function createAvtiActivity(options: AvtiActivityOptions = {}): AvtiActiv
     },
     update(nextLabel: string) {
       label = nextLabel
+      if (active && motion) writeFrame()
+    },
+    setFrames(nextFrames: readonly string[]) {
+      if (nextFrames.length === 0) return
+      frames = nextFrames
+      frameIndex = 0
       if (active && motion) writeFrame()
     },
     succeed(nextLabel = 'Done') {
