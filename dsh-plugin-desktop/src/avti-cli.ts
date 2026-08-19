@@ -1,6 +1,8 @@
 /** Thin Avti-branded entrypoint over the existing DeepSeek Harness CLI runtime. */
 
 import { readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { runAvtiControl } from './avti-control.ts'
 import { runAvtiInteractive } from './avti-interactive.ts'
@@ -8,6 +10,8 @@ import { packagedDependencyPath } from './packaged-runtime-path.ts'
 import { renderAvtiIntro } from './avti-terminal-style.ts'
 
 const RUN_AS_NODE = 'ELECTRON_RUN_AS_NODE'
+const DSH_HOME = 'DSH_HOME'
+const AVTI_CLI_HOME = 'AVTI_CLI_HOME'
 const DSH_ENTRY_URL = pathToFileURL(
   packagedDependencyPath(import.meta.url, '@deepseek-ai/dsh/lib/bin.js'),
 ).href
@@ -19,15 +23,15 @@ export const AVTI_CLI_HELP = `AVTI
 Usage:
   avti                            start an interactive session in this project
   avti <task>                     run one task and exit
-  avti resume <session-id>        continue a saved session from this project
-  avti status                     show project and default model
+  avti resume <session-id>        continue a saved CLI session from this project
+  avti status                     show project and CLI default model
   avti models [provider]          list available models
-  avti model [provider] <model>   show or change the shared default model
-  avti sessions                   list recent sessions for this project
+  avti model [provider] <model>   show or change the CLI default model
+  avti sessions                   list recent CLI sessions for this project
   avti doctor                     check workspace and Harness services
-  avti --profile <name> [args]    boot an Avti profile
-  avti web [args]                 boot the web profile
-  avti plugin [args]              manage profile plugins
+  avti --profile <name> [args]    boot an Avti CLI profile
+  avti web [args]                 boot the CLI-owned web profile
+  avti plugin [args]              manage CLI profile plugins
 
 Options:
   -h, --help                      show Avti CLI help
@@ -40,6 +44,11 @@ Interactive commands:
   /model [provider] <model>       show or change model for following turns
   /sessions                       show recent project sessions
   /exit                           leave Avti
+
+State:
+  default home                    ~/.avti/cli
+  AVTI_CLI_HOME                   override the Avti CLI home
+  DSH_HOME                        advanced Harness home override
 
 Examples:
   avti
@@ -82,6 +91,23 @@ export function clearAvtiElectronRunAsNode(environment: NodeJS.ProcessEnv): void
   for (const key of Object.keys(environment)) {
     if (key.toUpperCase() === RUN_AS_NODE) delete environment[key]
   }
+}
+
+/**
+ * Give Avti CLI an independent Harness home unless the caller explicitly chose one.
+ * Desktop keeps its own process/home; CLI defaults to ~/.avti/cli and therefore owns
+ * separate settings, profiles, credentials, plugins and persisted sessions.
+ */
+export function configureAvtiCliHome(environment: NodeJS.ProcessEnv): string {
+  const explicitDshHome = environment[DSH_HOME]?.trim()
+  if (explicitDshHome !== undefined && explicitDshHome !== '') return explicitDshHome
+
+  const configured = environment[AVTI_CLI_HOME]?.trim()
+  const home = configured !== undefined && configured !== ''
+    ? configured
+    : join(homedir(), '.avti', 'cli')
+  environment[DSH_HOME] = home
+  return home
 }
 
 function packageVersion(): string {
@@ -138,8 +164,8 @@ export function resolveAvtiInvocation(args: readonly string[]): AvtiInvocation {
 
 /**
  * Launch Avti over the existing Harness runtime. Avti owns only the outer grammar,
- * interactive terminal frontend and presentation; tools, permissions, sessions,
- * model calls and agent execution remain upstream.
+ * independent CLI home, interactive terminal frontend and presentation; tools,
+ * permissions, sessions, model calls and agent execution remain upstream.
  */
 export async function runAvtiCli(
   environment: NodeJS.ProcessEnv = process.env,
@@ -147,6 +173,7 @@ export async function runAvtiCli(
   argv: string[] = process.argv,
 ): Promise<void> {
   clearAvtiElectronRunAsNode(environment)
+  configureAvtiCliHome(environment)
   const invocation = resolveAvtiInvocation(argv.slice(2))
 
   if (invocation.mode === 'help') {
