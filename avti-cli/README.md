@@ -17,13 +17,14 @@ Avti CLI defaults its Harness home to:
 ~/.avti/cli
 ```
 
-That directory owns CLI settings, profiles, credentials, plugins and persisted sessions. Desktop configuration is not read or modified by default.
+That directory owns CLI settings, profiles, credentials, plugins, UI preferences and persisted sessions. Desktop configuration is not read or modified by default.
 
 Advanced overrides:
 
 ```text
 AVTI_CLI_HOME   Avti-specific CLI home override
 DSH_HOME        explicit Harness home override
+AVTI_THEME      override the persisted terminal theme for this process
 ```
 
 ## Portable releases
@@ -119,7 +120,72 @@ avti resume <session-id>        continue a persisted CLI session
 avti doctor                     check CLI runtime and project services
 ```
 
-Interactive Avti commands include `/status`, `/models`, `/model`, `/sessions`, `/help` and `/exit`. Other registered slash commands such as Harness command plugins are delegated to the native Harness command registry rather than being reimplemented by Avti.
+### Slash command palette
+
+Start interactive Avti and type `/`. Avti renders matching commands live below the prompt. Continue typing to filter them (`/mo` narrows to `/model` and `/models`) or press `Tab` to use readline completion.
+
+The palette is built from both Avti-owned commands and the native Harness command registry. Harness commands supplied by current or future command plugins therefore appear automatically without a second hard-coded list.
+
+Interactive Avti commands include `/status`, `/models`, `/model`, `/sessions`, `/theme`, `/help` and `/exit`. Other registered slash commands are delegated to Harness.
+
+### Terminal themes
+
+Run:
+
+```text
+/theme
+```
+
+Available themes are:
+
+```text
+claude      Claude Warm
+midnight    Midnight
+forest      Forest
+mono        Mono
+```
+
+Select one with, for example:
+
+```text
+/theme midnight
+```
+
+The choice is persisted in the CLI home and affects subsequent prompts. `AVTI_THEME` can override it for one process, and `NO_COLOR` remains respected.
+
+## ClaudeGravity / Antigravity models
+
+Avti ships a provider preset named `antigravity` that mirrors the model catalog used by the ClaudeGravity project. The preset uses Harness' provider-neutral LLM registry and points at the same local Anthropic-compatible Antigravity proxy:
+
+```text
+http://127.0.0.1:8080
+```
+
+This means Avti does not reimplement Google's Cloud Code/Antigravity transport. Authentication, Google account handling and upstream protocol compatibility stay in `antigravity-claude-proxy`; Avti talks to its local Anthropic Messages surface.
+
+Start/authenticate the proxy through ClaudeGravity (or `acc`) first. Then inspect the catalog:
+
+```bash
+avti models antigravity
+```
+
+Select a model globally:
+
+```bash
+avti model antigravity gemini-3.7-flash-high
+```
+
+Or during an interactive session:
+
+```text
+/model antigravity gemini-3.7-flash-high
+```
+
+The preset currently includes the ClaudeGravity catalog of Gemini and Claude routes, including Gemini 2.5 Pro, Gemini 3.x Flash/Pro variants, Claude Sonnet 4.6 and Claude Opus 4.6 Thinking. `gemini-2.5-pro` advertises the same 2M context window used by ClaudeGravity; the other mirrored routes use the 1M catalog default, with Gemini 3.7 Flash routes exposing the proxy's 65,536-token output capability.
+
+When `antigravity` is the selected provider, `avti doctor` also checks the local proxy health endpoint.
+
+The generated provider overlay is stored under the Avti CLI home and is applied consistently to interactive, resumed, control and one-shot CLI modes. The local proxy key defaults to the conventional `antigravity` value and can be overridden with `ANTIGRAVITY_API_KEY` if the proxy is configured differently.
 
 ## Development
 
