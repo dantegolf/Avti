@@ -140,6 +140,24 @@ jobs:
       - name: Build standalone macOS CLI
         shell: bash
         run: yarn workspace avti-cli dist:mac
+      - name: Sign and notarize macOS CLI
+        shell: bash
+        env:
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_NOTARY_KEY_P8_BASE64: ${{ secrets.APPLE_NOTARY_KEY_P8_BASE64 }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        run: bash avti-cli/scripts/sign-notarize-macos.sh "avti-cli/dist/avti-macos-${{ matrix.arch }}"
+      - name: Smoke-test signed macOS CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          reported=$("avti-cli/dist/avti-macos-${{ matrix.arch }}/avti" --version)
+          if [[ "$reported" != '${{ needs.metadata.outputs.version }}' ]]; then
+            echo "Signed portable CLI reported $reported instead of ${{ needs.metadata.outputs.version }}" >&2
+            exit 1
+          fi
       - name: Create tarball and checksum
         shell: bash
         run: |
@@ -213,8 +231,8 @@ jobs:
             '- macOS Intel: avti-macos-x64.tar.gz' \
             '' \
             'Each platform artifact has a matching SHA-256 manifest.' \
-            '' \
-            'Current CLI builds are unsigned. macOS signing/notarization and Windows code signing will be added independently from Desktop signing.' \
+            'macOS artifacts are Developer ID signed and notarized by Apple.' \
+            'Windows code signing is handled independently.' \
             > "$notes"
 
           gh release create "$RELEASE_TAG" "${files[@]}" \
