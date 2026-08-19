@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { runAvtiCli, shouldRenderAvtiIntro } from '../src/avti-cli.ts'
+import {
+  AVTI_CLI_HELP,
+  clearAvtiElectronRunAsNode,
+  resolveAvtiInvocation,
+  runAvtiCli,
+} from '../src/avti-cli.ts'
 import {
   AVTI_INTRO_FRAMES,
   AVTI_ORBIT_FRAMES,
@@ -63,26 +68,77 @@ describe('Avti CLI presentation', () => {
     expect(sleep).toHaveBeenCalledTimes(3)
   })
 
-  it('keeps global Harness launcher output undecorated', () => {
-    expect(shouldRenderAvtiIntro([])).toBe(true)
-    expect(shouldRenderAvtiIntro(['--help'])).toBe(false)
-    expect(shouldRenderAvtiIntro(['-h'])).toBe(false)
-    expect(shouldRenderAvtiIntro(['--version'])).toBe(false)
-    expect(shouldRenderAvtiIntro(['-V'])).toBe(false)
-    expect(shouldRenderAvtiIntro(['plugin', '--help'])).toBe(false)
-    expect(shouldRenderAvtiIntro(['--profile', 'headless', 'fix tests'])).toBe(true)
+  it('owns a concise Avti-facing help surface', () => {
+    expect(AVTI_CLI_HELP).toContain('Usage:\n  avti <task>')
+    expect(AVTI_CLI_HELP).toContain('avti --profile <name>')
+    expect(AVTI_CLI_HELP).not.toContain('Usage: dsh')
   })
 
-  it('forwards argv untouched and removes only Electron Node mode', async () => {
+  it('resolves help and version locally', () => {
+    expect(resolveAvtiInvocation([])).toEqual({ mode: 'help' })
+    expect(resolveAvtiInvocation(['--help'])).toEqual({ mode: 'help' })
+    expect(resolveAvtiInvocation(['-h'])).toEqual({ mode: 'help' })
+    expect(resolveAvtiInvocation(['--version'])).toEqual({ mode: 'version' })
+    expect(resolveAvtiInvocation(['-V'])).toEqual({ mode: 'version' })
+  })
+
+  it('maps ordinary Avti tasks onto the existing headless Harness profile', () => {
+    expect(resolveAvtiInvocation(['fix tests'])).toEqual({
+      mode: 'harness',
+      args: ['--profile', 'headless', 'fix tests'],
+      intro: true,
+    })
+    expect(resolveAvtiInvocation(['fix', 'tests'])).toEqual({
+      mode: 'harness',
+      args: ['--profile', 'headless', 'fix', 'tests'],
+      intro: true,
+    })
+  })
+
+  it('passes explicit Harness launcher modes through unchanged', () => {
+    expect(resolveAvtiInvocation(['web'])).toEqual({
+      mode: 'harness',
+      args: ['web'],
+      intro: false,
+    })
+    expect(resolveAvtiInvocation(['plugin', '--profile', 'desktop', 'list'])).toEqual({
+      mode: 'harness',
+      args: ['plugin', '--profile', 'desktop', 'list'],
+      intro: false,
+    })
+    expect(resolveAvtiInvocation(['--profile', 'headless', 'fix tests'])).toEqual({
+      mode: 'harness',
+      args: ['--profile', 'headless', 'fix tests'],
+      intro: true,
+    })
+    expect(resolveAvtiInvocation(['--profile=web', '--help'])).toEqual({
+      mode: 'harness',
+      args: ['--profile=web', '--help'],
+      intro: false,
+    })
+  })
+
+  it('removes every Windows casing of Electron Node mode', () => {
     const environment = {
       ELECTRON_RUN_AS_NODE: '1',
-      DSH_HOME: 'C:\\Avti',
+      electron_run_as_node: 'inherited',
+      Path: 'C:\\Windows',
+    }
+
+    clearAvtiElectronRunAsNode(environment)
+
+    expect(environment).toEqual({ Path: 'C:\\Windows' })
+  })
+
+  it('loads the existing Harness entry without changing explicit profile arguments', async () => {
+    const environment = {
+      ELECTRON_RUN_AS_NODE: '1',
       KEEP: 'value',
     }
-    const argv = [process.execPath, '/app/avti.js', '--help']
+    const argv = [process.execPath, '/app/avti.js', '--profile', 'web']
     const load = vi.fn(async (url: string) => {
-      expect(environment).toEqual({ DSH_HOME: 'C:\\Avti', KEEP: 'value' })
-      expect(argv).toEqual([process.execPath, '/app/avti.js', '--help'])
+      expect(environment).toEqual({ KEEP: 'value' })
+      expect(argv).toEqual([process.execPath, '/app/avti.js', '--profile', 'web'])
       expect(url).toMatch(/\/node_modules\/@deepseek-ai\/dsh\/lib\/bin\.js$/u)
     })
 
