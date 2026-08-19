@@ -1,5 +1,6 @@
 /** Thin Avti-branded entrypoint over the existing DeepSeek Harness CLI runtime. */
 
+import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -97,6 +98,12 @@ export interface AvtiControlInvocation {
 
 export type AvtiInvocation = AvtiHarnessInvocation | AvtiLocalInvocation | AvtiResumeInvocation | AvtiControlInvocation
 
+type HarnessLoader = (
+  url: string,
+  argv: readonly string[],
+  environment: NodeJS.ProcessEnv,
+) => Promise<unknown>
+
 /** Remove Electron Node mode before Harness creates child processes. */
 export function clearAvtiElectronRunAsNode(environment: NodeJS.ProcessEnv): void {
   for (const key of Object.keys(environment)) {
@@ -174,13 +181,47 @@ export function resolveAvtiInvocation(args: readonly string[]): AvtiInvocation {
 }
 
 /**
+ * `@deepseek-ai/dsh/lib/bin.js` is a CLI entrypoint, not a library API. Importing
+ * it from Avti can make its own direct-execution guard treat the module as a plain
+ * import and return without running anything. Execute it as a real Node child so
+ * its argv/stdio/exit semantics match the published `dsh` command.
+ */
+async function runHarnessCliEntry(
+  url: string,
+  argv: readonly string[],
+  environment: NodeJS.ProcessEnv,
+): Promise<void> {
+  const entry = fileURLToPath(url)
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(process.execPath, [entry, ...argv.slice(2)], {
+      cwd: process.cwd(),
+      env: environment,
+      stdio: 'inherit',
+    })
+
+    child.once('error', reject)
+    child.once('exit', (code, signal) => {
+      if (signal !== null) {
+        reject(new Error(`Harness terminated by signal ${signal}`))
+        return
+      }
+      if (code !== 0) {
+        reject(new Error(`Harness exited with code ${code ?? 1}`))
+        return
+      }
+      resolve()
+    })
+  })
+}
+
+/**
  * Launch Avti over the existing Harness runtime. Avti owns only the outer grammar,
  * independent CLI home, interactive terminal frontend and presentation; tools,
  * permissions, sessions, model calls and agent execution remain upstream.
  */
 export async function runAvtiCli(
   environment: NodeJS.ProcessEnv = process.env,
-  load: (url: string) => Promise<unknown> = url => import(url),
+  load: HarnessLoader = runHarnessCliEntry,
   argv: string[] = process.argv,
   prepareProviderPatch: (environment: NodeJS.ProcessEnv) => string = ensureAvtiAntigravityPatch,
 ): Promise<void> {
@@ -224,7 +265,7 @@ export async function runAvtiCli(
   if (invocation.intro) {
     await renderAvtiIntro({ output: process.stdout, environment })
   }
-  await load(DSH_ENTRY_URL)
+  await load(DSH_ENTRY_URL, argv, environment)
 }
 
 function isDirectExecution(): boolean {
