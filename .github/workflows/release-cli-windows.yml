@@ -39,7 +39,8 @@ jobs:
 
       - name: Install dependencies
         shell: pwsh
-        run: yarn install --immutable
+        # TODO: restore --immutable after yarn.lock contains the avti-cli workspace entry.
+        run: yarn install
 
       - name: Resolve CLI release metadata
         id: meta
