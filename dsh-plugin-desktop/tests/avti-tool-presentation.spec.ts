@@ -11,7 +11,7 @@ import {
 
 describe('Avti tool presentation', () => {
   it('maps common Harness tools to user-facing work labels', () => {
-    expect(avtiToolPresentation('fs_read')).toEqual({
+    expect(avtiToolPresentation('read')).toEqual({
       active: 'Reading files',
       success: 'Read files',
       failure: 'Could not read files',
@@ -60,8 +60,34 @@ describe('Avti tool presentation', () => {
     activity.succeed('Ran command')
 
     expect(output).toContain('◜ Thinking')
-    expect(output).toContain('∙····')
-    expect(output).toContain('Running command')
+    expect(output).toContain('∙···· Running command')
     expect(output).toContain('✓ Ran command')
+  })
+
+  it('keeps meaningful status transitions when motion is disabled', () => {
+    let output = ''
+    const activity = createAvtiActivity({
+      output: {
+        isTTY: true,
+        write(chunk: string) {
+          output += chunk
+          return true
+        },
+      },
+      environment: { AVTI_NO_MOTION: '1' },
+    })
+
+    activity.start('Thinking')
+    activity.update('Reading files')
+    activity.update('Reading files')
+    activity.update('Running command')
+    activity.succeed('Ran command')
+
+    expect(output).toBe(
+      '  · Thinking\n'
+      + '  · Reading files\n'
+      + '  · Running command\n'
+      + '  ✓ Ran command\n',
+    )
   })
 })
