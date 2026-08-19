@@ -12,6 +12,7 @@ const run = (command, args, cwd = root) => execFileSync(command, args, {
 const fail = message => { throw new Error(`verify-layout: ${message}`) }
 
 const workspace = readJson('package.json')
+const cli = readJson('avti-cli/package.json')
 const plugin = readJson('dsh-plugin-desktop/package.json')
 const fabric = readJson('dsh-community-fabric/package.json')
 const market = readJson('dsh-community-market/package.json')
@@ -20,19 +21,22 @@ if (workspace.packageManager !== 'yarn@4.18.0') {
   fail('the product workspace must pin yarn@4.18.0')
 }
 if (JSON.stringify(workspace.workspaces) !== JSON.stringify([
+  'avti-cli',
   'dsh-plugin-desktop',
   'dsh-community-fabric',
   'dsh-community-market',
 ])) {
-  fail('the root Yarn workspace must contain the desktop, community-fabric, and community-market packages')
+  fail('the root Yarn workspace must contain Avti CLI, desktop, community-fabric, and community-market packages')
 }
 for (const [name, manifest] of [
+  ['avti-cli', cli],
   ['dsh-plugin-desktop', plugin],
   ['dsh-community-fabric', fabric],
   ['dsh-community-market', market],
 ]) {
   if (manifest.packageManager !== undefined) fail(`${name} must inherit the root Yarn release`)
 }
+if (cli.name !== 'avti-cli') fail('the CLI workspace must own avti-cli')
 if (fabric.name !== 'dsh-community-fabric') fail('the Fabric workspace must own dsh-community-fabric')
 if (market.name !== 'dsh-community-market') fail('the market workspace must own dsh-community-market')
 
@@ -50,6 +54,8 @@ if (claudeTarget !== 'AGENTS.md') {
 for (const legacyFile of [
   'pnpm-lock.yaml',
   'pnpm-workspace.yaml',
+  'avti-cli/pnpm-lock.yaml',
+  'avti-cli/pnpm-workspace.yaml',
   'dsh-plugin-desktop/pnpm-lock.yaml',
   'dsh-plugin-desktop/pnpm-workspace.yaml',
   'dsh-community-fabric/pnpm-lock.yaml',
@@ -68,6 +74,7 @@ for (const removedUpstreamPath of ['.gitmodules', 'upstream.json', 'deepseek-har
 
 for (const [owner, manifest] of [
   ['root', workspace],
+  ['cli', cli],
   ['desktop', plugin],
   ['fabric', fabric],
   ['market', market],
