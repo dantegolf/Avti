@@ -71,20 +71,31 @@ avti model
 avti model <model>
 avti model <provider> <model>
 avti sessions
+avti resume <session-id>
 avti doctor
 ```
 
 `avti model` читает и сохраняет общий default model через Harness settings. Поэтому выбор модели не хранится во втором Avti-конфиге отдельно от Desktop: новые Desktop/CLI-сессии используют один и тот же default model state.
 
-`avti sessions` показывает последние сохранённые сессии для текущей папки проекта. `avti doctor` без model call проверяет workspace, agent runtime, persistence, session history, выбранного provider и разрешение выбранной model.
+`avti sessions` показывает последние сохранённые сессии для текущей папки проекта. Продолжить одну из них можно через `avti resume <session-id>`. Перед восстановлением Avti проверяет, что сохранённая сессия принадлежит текущей папке проекта, а затем использует штатный Harness session resume.
 
-Полезные команды интерактивного режима:
+`avti doctor` без model call проверяет workspace, agent runtime, persistence, session history, выбранного provider и разрешение выбранной model.
+
+Полезные команды внутри интерактивной сессии:
 
 ```text
-/help   показать команды терминала
-/exit   выйти из Avti
-/quit   выйти из Avti
+/help                    показать команды терминала
+/status                  показать project, model и session
+/models [provider]       показать доступные модели
+/model                   показать текущую модель
+/model <model>           сменить модель на текущем provider
+/model <provider> <id>   сменить provider и модель
+/sessions                показать сессии текущего проекта
+/exit                    выйти из Avti
+/quit                    выйти из Avti
 ```
+
+Смена модели через `/model` применяется к следующим turn той же живой сессии и одновременно сохраняется как общий default model для следующих сессий.
 
 Avti CLI оставляет agent loop, tools, permissions, sessions и model calls существующему runtime; собственный terminal frontend отвечает за ввод, потоковый вывод, статусы инструментов и approval/question prompts. В pipes и CI декоративная заставка и cursor-анимации не печатаются, чтобы one-shot вывод оставался пригодным для автоматизации.
 
@@ -124,7 +135,7 @@ irm https://raw.githubusercontent.com/dantegolf/Avti/main/install.ps1 | iex
 - **AI-агент и проектный контекст** — сессии, attachments, commands, tools, code runtime, permissions и sandbox-возможности.
 - **Подключаемые модели** — конфигурация AI-провайдеров и моделей через интерфейс приложения и CLI-команды поверх общего settings layer.
 - **Десктопный интерфейс** — sidebar, conversation и details surface в нативном окне с системным tray.
-- **Терминальный режим** — интерактивный `avti`, one-shot задачи, streaming-ответы, tool activity, approvals, вопросы пользователю и diagnostics.
+- **Терминальный режим** — интерактивный `avti`, one-shot задачи, streaming-ответы, tool activity, approvals, вопросы пользователю, session resume и diagnostics.
 - **Profiles** — отдельные конфигурации окружения, плагинов и runtime.
 - **Plugin Market** — встроенный каталог community-плагинов с установкой, удалением и управлением.
 - **Диагностика** — локальные логи, boot health, crash evidence, экспорт диагностики и recovery-потоки.
