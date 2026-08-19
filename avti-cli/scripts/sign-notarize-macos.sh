@@ -14,12 +14,21 @@ required=(
   APPLE_NOTARY_KEY_ID
   APPLE_NOTARY_ISSUER_ID
 )
+missing=()
 for name in "${required[@]}"; do
   if [[ -z "${!name:-}" ]]; then
-    echo "Missing required GitHub Actions secret: $name" >&2
-    exit 1
+    missing+=("$name")
   fi
 done
+
+if (( ${#missing[@]} > 0 )); then
+  if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+    printf 'Missing required GitHub Actions secret for tagged macOS release: %s\n' "${missing[*]}" >&2
+    exit 1
+  fi
+  printf 'Apple signing secrets are not configured; leaving dev artifact unsigned: %s\n' "${missing[*]}"
+  exit 0
+fi
 
 artifact_root="$(cd "$artifact_root" && pwd)"
 work_dir="$(mktemp -d)"
