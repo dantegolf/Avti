@@ -93,7 +93,7 @@ interface TurnPresentationState {
 
 interface InteractiveUi {
   readonly readline: Interface
-  activity?: AvtiActivity
+  activity: AvtiActivity | undefined
 }
 
 function sleep(milliseconds: number): Promise<void> {
@@ -427,7 +427,7 @@ export async function runAvtiInteractive(options: AvtiInteractiveOptions = {}): 
     historySize: 100,
     completer: createAvtiSlashCompleter(() => commandSuggestions()),
   })
-  const ui: InteractiveUi = { readline }
+  const ui: InteractiveUi = { readline, activity: undefined }
 
   try {
     await ctx.get('loader')?.await()
@@ -442,7 +442,7 @@ export async function runAvtiInteractive(options: AvtiInteractiveOptions = {}): 
     const theme: AvtiThemeRef = { current: loadAvtiTheme() }
     handle = await createOrResumeAgent({
       ctx,
-      resumeSessionId: options.resumeSessionId,
+      ...(options.resumeSessionId === undefined ? {} : { resumeSessionId: options.resumeSessionId }),
       selection: selected,
       defaultSelection,
     })
