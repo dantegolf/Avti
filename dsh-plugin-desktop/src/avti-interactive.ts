@@ -35,6 +35,12 @@ import {
   type AvtiActivity,
 } from './avti-terminal-style.ts'
 import {
+  currentAvtiSelection,
+  handleAvtiSessionControl,
+  latestAvtiSessionSelection,
+  type AvtiSessionControlContext,
+} from './avti-session-controls.ts'
+import {
   avtiToolPresentation,
   type AvtiToolPresentation,
 } from './avti-tool-presentation.ts'
@@ -354,152 +360,6 @@ async function bootInteractiveProfile(): Promise<{ ctx: Context; shutdown: Proce
   }
 }
 
-function latestSessionSelection(events: readonly SessionEvent[]): ModelSelection | undefined {
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    const event = events[index]
-    if (event?.type !== 'request/header') continue
-    const config = event.data.header.config
-    return {
-      provider: config.provider,
-      model: config.model,
-      ...(config.reasoningEffort === undefined ? {} : { reasoningEffort: config.reasoningEffort }),
-    }
-  }
-  return undefined
-}
-
-function currentSelection(selection: ModelSelectionRef, agent: Agent, fallback: ModelSelection): ModelSelection {
-  return selection.current ?? latestSessionSelection(agent.session.events) ?? fallback
-}
-
-async function renderInteractiveModels(ctx: Context, selected: ModelSelection, providerFilter?: string): Promise<void> {
-  const llm = ctx.get('llm')
-  if (llm === undefined) {
-    process.stdout.write('\n  × Model registry is unavailable\n\n')
-    return
-  }
-  const providers = llm.listProviders().filter(provider => providerFilter === undefined || provider.id === providerFilter)
-  if (providers.length === 0) {
-    process.stdout.write(`\n  × Provider not found: ${providerFilter ?? '(none)'}\n\n`)
-    return
-  }
-
-  process.stdout.write('\n')
-  for (const provider of providers) {
-    process.stdout.write(`  ${provider.name} · ${provider.id}\n`)
-    try {
-      const models = await llm.listModels(provider.id)
-      if (models.length === 0) {
-        process.stdout.write('    · No catalog entries (custom model ids may still work)\n')
-        continue
-      }
-      for (const model of models) {
-        const mark = selected.provider === provider.id && selected.model === model.id ? '›' : ' '
-        process.stdout.write(`    ${mark} ${model.name} · ${model.id}\n`)
-      }
-    } catch (error: unknown) {
-      process.stdout.write(`    × ${error instanceof Error ? error.message : String(error)}\n`)
-    }
-  }
-  process.stdout.write('\n')
-}
-
-async function handleInteractiveCommand(options: {
-  readonly input: string
-  readonly ctx: Context
-  readonly agent: Agent
-  readonly selection: ModelSelectionRef
-  readonly defaultSelection: ModelSelection
-  readonly saveSelection: (next: ModelSelection) => Promise<void>
-}): Promise<'handled' | 'exit' | 'unhandled'> {
-  const trimmed = options.input.trim()
-  if (!trimmed.startsWith('/')) return 'unhandled'
-  const [command = '', ...args] = trimmed.split(/\s+/u)
-  const selected = currentSelection(options.selection, options.agent, options.defaultSelection)
-
-  switch (command.toLowerCase()) {
-    case '/exit':
-    case '/quit':
-      return 'exit'
-    case '/help':
-      process.stdout.write([
-        '',
-        '  /status                 show project, model and session',
-        '  /models [provider]      list available models',
-        '  /model                  show current model',
-        '  /model <model>          switch model on current provider',
-        '  /model <provider> <id>  switch provider and model',
-        '  /sessions               show recent project sessions',
-        '  /exit                   leave Avti',
-        '',
-      ].join('\n'))
-      return 'handled'
-    case '/status':
-      process.stdout.write([
-        '',
-        `  Project    ${process.cwd()}`,
-        `  Provider   ${selected.provider}`,
-        `  Model      ${selected.model}`,
-        ...(selected.reasoningEffort === undefined ? [] : [`  Reasoning  ${String(selected.reasoningEffort)}`]),
-        `  Session    ${String(options.agent.id)}`,
-        `  Permission ${process.env.DSH_PERMISSION_MODE ?? 'workspace-write'}`,
-        '',
-      ].join('\n'))
-      return 'handled'
-    case '/models':
-      await renderInteractiveModels(options.ctx, selected, args[0])
-      return 'handled'
-    case '/model': {
-      if (args.length === 0) {
-        process.stdout.write(`\n  ${selected.provider} · ${selected.model}\n\n`)
-        return 'handled'
-      }
-      const llm = options.ctx.get('llm')
-      if (llm === undefined) {
-        process.stdout.write('\n  × Model registry is unavailable\n\n')
-        return 'handled'
-      }
-      const provider = args.length === 1 ? selected.provider : args[0]!
-      const model = args.length === 1 ? args[0]! : args.slice(1).join(' ')
-      try {
-        const resolved = await llm.resolveModelInfo(provider, model)
-        const next: ModelSelection = { provider: resolved.provider, model: resolved.id }
-        options.selection.current = next
-        await options.saveSelection(next)
-        process.stdout.write(`\n  ✓ Model · ${resolved.name} (${resolved.provider}/${resolved.id})\n\n`)
-      } catch (error: unknown) {
-        process.stdout.write(`\n  × Could not select model: ${error instanceof Error ? error.message : String(error)}\n\n`)
-      }
-      return 'handled'
-    }
-    case '/sessions': {
-      const query = options.ctx.get('sessionQuery')
-      if (query === undefined) {
-        process.stdout.write('\n  × Session history is unavailable\n\n')
-        return 'handled'
-      }
-      try {
-        const records = (await query.listSessions())
-          .filter(record => record.persisted && record.header.cwd === process.cwd())
-          .slice(0, 10)
-        process.stdout.write('\n  Recent sessions\n')
-        if (records.length === 0) process.stdout.write('  No saved sessions for this project.\n')
-        for (const record of records) {
-          const mark = record.header.id === options.agent.id ? '›' : ' '
-          process.stdout.write(`  ${mark} ${String(record.header.id)} · ${new Date(record.header.createdAt).toLocaleString()}\n`)
-        }
-        process.stdout.write('\n  Resume from the shell with: avti resume <session-id>\n\n')
-      } catch (error: unknown) {
-        process.stdout.write(`\n  × Could not read sessions: ${error instanceof Error ? error.message : String(error)}\n\n`)
-      }
-      return 'handled'
-    }
-    default:
-      process.stdout.write(`\n  × Unknown command: ${command}\n  Run /help to see Avti commands.\n\n`)
-      return 'handled'
-  }
-}
-
 async function createOrResumeAgent(options: {
   readonly ctx: Context
   readonly resumeSessionId?: string
@@ -533,7 +393,7 @@ async function createOrResumeAgent(options: {
   }
 
   const snapshot = await query.readSession(id)
-  const restoredSelection = latestSessionSelection(snapshot.events) ?? options.defaultSelection
+  const restoredSelection = latestAvtiSessionSelection(snapshot.events) ?? options.defaultSelection
   options.selection.current = restoredSelection
   return agents.resume({
     resumeSessionId: id,
@@ -578,7 +438,14 @@ export async function runAvtiInteractive(options: AvtiInteractiveOptions = {}): 
     installTerminalInteraction(ctx, agent, ui)
     await agent.whenIdle()
 
-    const active = currentSelection(selected, agent, defaultSelection)
+    const controls: AvtiSessionControlContext = {
+      ctx,
+      agent,
+      selection: selected,
+      defaultSelection,
+      saveSelection: next => defaultModel.saveSelection(next),
+    }
+    const active = currentAvtiSelection(controls)
     process.stdout.write(`${process.cwd()} · ${active.model}${options.resumeSessionId === undefined ? '' : ' · resumed'}\n\n`)
 
     while (true) {
@@ -590,18 +457,20 @@ export async function runAvtiInteractive(options: AvtiInteractiveOptions = {}): 
       }
       if (task.trim() === '') continue
 
-      const commandResult = await handleInteractiveCommand({
-        input: task,
-        ctx,
-        agent,
-        selection: selected,
-        defaultSelection,
-        saveSelection: next => defaultModel.saveSelection(next),
-      })
-      if (commandResult === 'exit') break
-      if (commandResult === 'handled') continue
-
       const firstEventIndex = agent.session.events.length
+      const commandResult = await handleAvtiSessionControl(task, controls)
+      if (commandResult === 'exit') break
+      if (commandResult === 'handled') {
+        const openedTurn = agent.session.events
+          .slice(firstEventIndex)
+          .some(event => event.type === 'turn/start')
+        if (openedTurn || agent.status === 'running') {
+          await presentTurn(agent, firstEventIndex, ui)
+        }
+        await sessions.flush(agent.session)
+        continue
+      }
+
       agent.followup(createUserMessage({
         content: [{ type: 'text', text: task }],
         source: { kind: 'user' },
