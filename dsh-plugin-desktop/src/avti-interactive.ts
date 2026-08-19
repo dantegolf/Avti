@@ -27,6 +27,12 @@ import type {
   AskUserQuestionRequest,
 } from '@deepseek-ai/dsh-user-questions'
 import {
+  createAvtiSlashCompleter,
+  listAvtiCommandSuggestions,
+  questionWithAvtiSlashPalette,
+  type AvtiCommandSuggestion,
+} from './avti-command-palette.ts'
+import {
   AVTI_ORBIT_FRAMES,
   AVTI_PULSE_FRAMES,
   createAvtiActivity,
@@ -40,6 +46,7 @@ import {
   latestAvtiSessionSelection,
   type AvtiSessionControlContext,
 } from './avti-session-controls.ts'
+import { formatAvtiPrompt, loadAvtiTheme, type AvtiThemeRef } from './avti-theme.ts'
 import {
   avtiToolPresentation,
   type AvtiToolPresentation,
@@ -410,11 +417,13 @@ export async function runAvtiInteractive(options: AvtiInteractiveOptions = {}): 
 
   const { ctx, shutdown } = await bootInteractiveProfile()
   let handle: AgentHandle | undefined
+  let commandSuggestions: () => readonly AvtiCommandSuggestion[] = () => []
   const readline = createInterface({
     input: process.stdin,
     output: process.stdout,
     terminal: true,
     historySize: 100,
+    completer: createAvtiSlashCompleter(() => commandSuggestions()),
   })
   const ui: InteractiveUi = { readline }
 
@@ -428,6 +437,7 @@ export async function runAvtiInteractive(options: AvtiInteractiveOptions = {}): 
 
     const defaultSelection = defaultModel.currentSelection()
     const selected: ModelSelectionRef = { current: undefined, assembled: undefined }
+    const theme: AvtiThemeRef = { current: loadAvtiTheme() }
     handle = await createOrResumeAgent({
       ctx,
       resumeSessionId: options.resumeSessionId,
@@ -435,6 +445,7 @@ export async function runAvtiInteractive(options: AvtiInteractiveOptions = {}): 
       defaultSelection,
     })
     const agent = handle.agent
+    commandSuggestions = () => listAvtiCommandSuggestions(ctx, agent)
     installTerminalInteraction(ctx, agent, ui)
     await agent.whenIdle()
 
@@ -444,6 +455,7 @@ export async function runAvtiInteractive(options: AvtiInteractiveOptions = {}): 
       selection: selected,
       defaultSelection,
       saveSelection: next => defaultModel.saveSelection(next),
+      theme,
     }
     const active = currentAvtiSelection(controls)
     process.stdout.write(`${process.cwd()} · ${active.model}${options.resumeSessionId === undefined ? '' : ' · resumed'}\n\n`)
@@ -451,7 +463,10 @@ export async function runAvtiInteractive(options: AvtiInteractiveOptions = {}): 
     while (true) {
       let task: string
       try {
-        task = await readline.question('› ')
+        task = await questionWithAvtiSlashPalette({
+          readline,
+          getSuggestions: commandSuggestions,
+        }, formatAvtiPrompt(theme.current))
       } catch {
         break
       }
