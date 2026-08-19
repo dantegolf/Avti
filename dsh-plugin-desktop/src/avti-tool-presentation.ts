@@ -10,6 +10,10 @@ export interface AvtiToolPresentation {
 }
 
 const EXACT_PRESENTATIONS: Readonly<Record<string, AvtiToolPresentation>> = {
+  read: { active: 'Reading files', success: 'Read files', failure: 'Could not read files' },
+  read_image: { active: 'Reading image', success: 'Read image', failure: 'Could not read image' },
+  write: { active: 'Writing files', success: 'Wrote files', failure: 'Could not write files' },
+  edit: { active: 'Editing files', success: 'Edited files', failure: 'Could not edit files' },
   fs_read: { active: 'Reading files', success: 'Read files', failure: 'Could not read files' },
   read_file: { active: 'Reading files', success: 'Read files', failure: 'Could not read files' },
   fs_write: { active: 'Writing files', success: 'Wrote files', failure: 'Could not write files' },
@@ -44,7 +48,7 @@ export function humanizeAvtiToolName(name: string): string {
     .filter(Boolean)
   if (words.length === 0) return 'Tool'
   return words
-    .map(word => word.length <= 3 && word === word.toUpperCase() ? word : word[0]!.toUpperCase() + word.slice(1))
+    .map(word => word[0]!.toUpperCase() + word.slice(1))
     .join(' ')
 }
 
@@ -54,7 +58,7 @@ export function avtiToolPresentation(name: string): AvtiToolPresentation {
   const exact = EXACT_PRESENTATIONS[normalized]
   if (exact !== undefined) return exact
 
-  if (normalized.includes('search')) {
+  if (normalized.includes('search') || normalized.includes('grep') || normalized.includes('glob')) {
     return { active: 'Searching project', success: 'Searched project', failure: 'Search failed' }
   }
   if (normalized.includes('read')) {
