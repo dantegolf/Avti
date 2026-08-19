@@ -20,8 +20,20 @@ if (!existsSync(join(libRoot, 'avti.js'))) {
 if (!existsSync(focusedNodeModules)) {
   throw new Error('Avti CLI production node_modules is missing; run `yarn workspaces focus avti-cli --production` first')
 }
+if (existsSync(join(focusedNodeModules, 'electron'))) {
+  throw new Error('Avti CLI production tree unexpectedly contains Electron')
+}
+if (existsSync(join(focusedNodeModules, 'dsh-plugin-desktop'))) {
+  throw new Error('Avti CLI production tree unexpectedly depends on dsh-plugin-desktop')
+}
 
 const packageJson = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'))
+if (packageJson.dependencies?.electron !== undefined || packageJson.peerDependencies?.electron !== undefined) {
+  throw new Error('Avti CLI package metadata must not depend on Electron')
+}
+if (packageJson.dependencies?.['dsh-plugin-desktop'] !== undefined) {
+  throw new Error('Avti CLI package metadata must not depend on dsh-plugin-desktop')
+}
 
 rmSync(outputRoot, { recursive: true, force: true })
 mkdirSync(appRoot, { recursive: true })
