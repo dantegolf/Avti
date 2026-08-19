@@ -80,6 +80,8 @@ interface ProfileBootModule {
 export interface AvtiInteractiveOptions {
   /** Persisted Harness session to continue instead of creating a fresh one. */
   readonly resumeSessionId?: string
+  /** Generated Avti provider overlay shared by all CLI front doors. */
+  readonly providerPatchPath?: string
 }
 
 interface TurnPresentationState {
@@ -350,7 +352,7 @@ async function presentTurn(agent: Agent, firstEventIndex: number, ui: Interactiv
   }
 }
 
-async function bootInteractiveProfile(): Promise<{ ctx: Context; shutdown: ProcessShutdown }> {
+async function bootInteractiveProfile(providerPatchPath?: string): Promise<{ ctx: Context; shutdown: ProcessShutdown }> {
   const root = mkdtempSync(join(tmpdir(), 'avti-cli-'))
   const patchPath = join(root, 'interactive.patch.yml')
   writeFileSync(patchPath, INTERACTIVE_PATCH)
@@ -359,7 +361,7 @@ async function bootInteractiveProfile(): Promise<{ ctx: Context; shutdown: Proce
     return await module.runProfile({
       environment: loadLayeredEnv('dsh'),
       profile: 'headless',
-      patchFiles: [patchPath],
+      patchFiles: [patchPath, ...(providerPatchPath === undefined ? [] : [providerPatchPath])],
       args: [],
     })
   } finally {
@@ -415,7 +417,7 @@ export async function runAvtiInteractive(options: AvtiInteractiveOptions = {}): 
     throw new Error('interactive mode requires a terminal; pass a task as an argument for one-shot mode')
   }
 
-  const { ctx, shutdown } = await bootInteractiveProfile()
+  const { ctx, shutdown } = await bootInteractiveProfile(options.providerPatchPath)
   let handle: AgentHandle | undefined
   let commandSuggestions: () => readonly AvtiCommandSuggestion[] = () => []
   const readline = createInterface({
