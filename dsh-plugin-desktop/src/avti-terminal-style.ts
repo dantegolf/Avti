@@ -174,7 +174,7 @@ export function createAvtiActivity(options: AvtiActivityOptions = {}): AvtiActiv
 export async function renderAvtiIntro(options: AvtiMotionOptions = {}): Promise<void> {
   const output = options.output ?? process.stdout
   const environment = options.environment ?? process.env
-  const frameDelayMs = options.frameDelayMs ?? 55
+  const frameDelayMs = options.frameDelayMs ?? 110
   const sleep = options.sleep ?? defaultSleep
 
   if (output.isTTY !== true || environment.CI !== undefined) return
@@ -187,5 +187,6 @@ export async function renderAvtiIntro(options: AvtiMotionOptions = {}): Promise<
     output.write(`${ERASE_LINE}${CURSOR_COLUMN_ZERO}${AVTI_INTRO_FRAMES[index]}`)
     if (index + 1 < AVTI_INTRO_FRAMES.length) await sleep(frameDelayMs)
   }
+  await sleep(160)
   output.write('\n\n')
 }
