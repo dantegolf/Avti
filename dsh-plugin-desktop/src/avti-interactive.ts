@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createInterface } from 'node:readline/promises'
+import { createInterface, type Interface } from 'node:readline/promises'
 import { pathToFileURL } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
 import {
@@ -18,6 +18,12 @@ import { loadLayeredEnv } from '@deepseek-ai/dsh-app-boot'
 import type {} from '@deepseek-ai/cordis-plugin-loader'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
+import type { ApprovalRequest } from '@deepseek-ai/dsh-user-approval'
+import type {
+  AskUserQuestionAnswer,
+  AskUserQuestionItem,
+  AskUserQuestionRequest,
+} from '@deepseek-ai/dsh-user-questions'
 import { createAvtiActivity, type AvtiActivity } from './avti-terminal-style.ts'
 import { packagedDependencyPath } from './packaged-runtime-path.ts'
 
@@ -47,6 +53,11 @@ interface TurnPresentationState {
   turnError?: string
 }
 
+interface InteractiveUi {
+  readonly readline: Interface
+  activity?: AvtiActivity
+}
+
 function sleep(milliseconds: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, milliseconds))
 }
@@ -61,6 +72,101 @@ function assistantText(event: SessionEvent<'assistant/message'>): string {
 function showActivity(activity: AvtiActivity, label: string): void {
   activity.update(label)
   activity.start(label)
+}
+
+async function askTerminal(ui: InteractiveUi, prompt: string): Promise<string> {
+  ui.activity?.stop()
+  const answer = await ui.readline.question(prompt)
+  ui.activity?.start('Thinking')
+  return answer
+}
+
+function renderQuestion(question: AskUserQuestionItem): void {
+  const heading = question.header ?? question.question
+  process.stdout.write(`\n  ${heading}\n`)
+  if (question.header !== undefined) process.stdout.write(`  ${question.question}\n`)
+  if (question.detail !== undefined && question.detail !== '') {
+    for (const line of question.detail.split('\n')) process.stdout.write(`    ${line}\n`)
+  }
+  for (const [index, option] of (question.options ?? []).entries()) {
+    process.stdout.write(`  ${index + 1}. ${option.label}`)
+    if (option.description !== undefined && option.description !== '') {
+      process.stdout.write(` — ${option.description}`)
+    }
+    process.stdout.write('\n')
+  }
+}
+
+function parseQuestionAnswer(question: AskUserQuestionItem, raw: string): AskUserQuestionAnswer['answers'][number] {
+  const value = raw.trim()
+  const options = question.options ?? []
+  const requested = question.multiSelect === true
+    ? value.split(',').map(part => part.trim()).filter(Boolean)
+    : value === '' ? [] : [value]
+  const selected: string[] = []
+  const custom: string[] = []
+
+  for (const token of requested) {
+    const number = Number.parseInt(token, 10)
+    if (String(number) === token && number >= 1 && number <= options.length) {
+      const label = options[number - 1]?.label
+      if (label !== undefined && !selected.includes(label)) selected.push(label)
+      continue
+    }
+    const matching = options.find(option => option.label.toLowerCase() === token.toLowerCase())
+    if (matching !== undefined) {
+      if (!selected.includes(matching.label)) selected.push(matching.label)
+    } else if (token !== '') {
+      custom.push(token)
+    }
+  }
+
+  return {
+    id: question.id,
+    selected,
+    ...(custom.length > 0 ? { custom: custom.join(question.multiSelect === true ? ', ' : '') } : {}),
+  }
+}
+
+async function answerUserQuestions(
+  ui: InteractiveUi,
+  request: AskUserQuestionRequest,
+): Promise<AskUserQuestionAnswer> {
+  const answers: AskUserQuestionAnswer['answers'] = []
+  for (const question of request.questions) {
+    renderQuestion(question)
+    const options = question.options ?? []
+    const hint = options.length === 0
+      ? '› '
+      : question.multiSelect === true
+        ? '  Choose numbers (comma-separated) or type an answer: '
+        : '  Choose a number or type an answer: '
+    const raw = await askTerminal(ui, hint)
+    answers.push(parseQuestionAnswer(question, raw))
+  }
+  process.stdout.write('\n')
+  return { answers }
+}
+
+async function answerApproval(ui: InteractiveUi, request: ApprovalRequest): Promise<'allowed-once' | 'rejected'> {
+  process.stdout.write(`\n  Permission required · ${request.toolName}\n`)
+  if (request.reason !== undefined && request.reason !== '') process.stdout.write(`  ${request.reason}\n`)
+  const answer = (await askTerminal(ui, '  Allow once? [y/N] ')).trim().toLowerCase()
+  process.stdout.write('\n')
+  return answer === 'y' || answer === 'yes' ? 'allowed-once' : 'rejected'
+}
+
+function installTerminalInteraction(ctx: Context, agent: Agent, ui: InteractiveUi): void {
+  const questions = ctx.get('userQuestions')
+  if (questions !== undefined) {
+    questions.registerProvider({
+      ask: request => answerUserQuestions(ui, request),
+    })
+  }
+
+  // Agent-scoped listener: child agents keep Harness' fail-closed behavior rather
+  // than inheriting a human prompt intended for the root terminal session.
+  agent.ctx.on('approval/request', async (request: ApprovalRequest) => answerApproval(ui, request))
 }
 
 function renderSessionEvent(
@@ -116,8 +222,9 @@ function renderSessionEvent(
   }
 }
 
-async function presentTurn(agent: Agent, firstEventIndex: number): Promise<void> {
+async function presentTurn(agent: Agent, firstEventIndex: number, ui: InteractiveUi): Promise<void> {
   const activity = createAvtiActivity()
+  ui.activity = activity
   const state: TurnPresentationState = { streamedText: false, endsWithNewline: false }
   let eventIndex = firstEventIndex
   let settled = false
@@ -134,17 +241,22 @@ async function presentTurn(agent: Agent, firstEventIndex: number): Promise<void>
     }
   }
 
-  while (!settled) {
+  try {
+    while (!settled) {
+      drain()
+      await Promise.race([idle, sleep(35)])
+    }
+    await idle
     drain()
-    await Promise.race([idle, sleep(35)])
-  }
-  await idle
-  drain()
-  activity.stop()
+    activity.stop()
 
-  if (state.streamedText && !state.endsWithNewline) process.stdout.write('\n')
-  if (state.turnError !== undefined) process.stderr.write(`  × ${state.turnError}\n`)
-  process.stdout.write('\n')
+    if (state.streamedText && !state.endsWithNewline) process.stdout.write('\n')
+    if (state.turnError !== undefined) process.stderr.write(`  × ${state.turnError}\n`)
+    process.stdout.write('\n')
+  } finally {
+    activity.stop()
+    if (ui.activity === activity) ui.activity = undefined
+  }
 }
 
 async function bootInteractiveProfile(): Promise<Context> {
@@ -174,6 +286,7 @@ export async function runAvtiInteractive(): Promise<void> {
   const ctx = await bootInteractiveProfile()
   let handle: AgentHandle | undefined
   const readline = createInterface({ input: process.stdin, output: process.stdout, terminal: true })
+  const ui: InteractiveUi = { readline }
 
   try {
     await ctx.get('loader')?.await()
@@ -193,6 +306,7 @@ export async function runAvtiInteractive(): Promise<void> {
       setup: agentCtx => { installModelSelection(agentCtx, selected) },
     })
     const agent = handle.agent
+    installTerminalInteraction(ctx, agent, ui)
     await agent.whenIdle()
 
     process.stdout.write(`${process.cwd()} · ${selection.model}\n\n`)
@@ -217,10 +331,11 @@ export async function runAvtiInteractive(): Promise<void> {
         content: [{ type: 'text', text: task }],
         source: { kind: 'user' },
       }))
-      await presentTurn(agent, firstEventIndex)
+      await presentTurn(agent, firstEventIndex, ui)
       await sessions.flush(agent.session)
     }
   } finally {
+    ui.activity?.stop()
     readline.close()
     if (handle !== undefined) await handle.dispose()
     await ctx.fiber.dispose()
