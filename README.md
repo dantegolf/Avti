@@ -61,6 +61,23 @@ C:\Projects\my-app · model-name
 avti "объясни архитектуру этого проекта"
 ```
 
+CLI также предоставляет короткие команды управления поверх тех же runtime-настроек:
+
+```bash
+avti status
+avti models
+avti models <provider>
+avti model
+avti model <model>
+avti model <provider> <model>
+avti sessions
+avti doctor
+```
+
+`avti model` читает и сохраняет общий default model через Harness settings. Поэтому выбор модели не хранится во втором Avti-конфиге отдельно от Desktop: новые Desktop/CLI-сессии используют один и тот же default model state.
+
+`avti sessions` показывает последние сохранённые сессии для текущей папки проекта. `avti doctor` без model call проверяет workspace, agent runtime, persistence, session history, выбранного provider и разрешение выбранной model.
+
 Полезные команды интерактивного режима:
 
 ```text
@@ -105,9 +122,9 @@ irm https://raw.githubusercontent.com/dantegolf/Avti/main/install.ps1 | iex
 - **Работа с локальными проектами** — workspaces, выбор папок, drag-and-drop и нативный directory picker на Windows.
 - **Desktop + CLI** — графический интерфейс и терминальный frontend над общими runtime-возможностями проекта.
 - **AI-агент и проектный контекст** — сессии, attachments, commands, tools, code runtime, permissions и sandbox-возможности.
-- **Подключаемые модели** — конфигурация AI-провайдеров и моделей через интерфейс приложения.
+- **Подключаемые модели** — конфигурация AI-провайдеров и моделей через интерфейс приложения и CLI-команды поверх общего settings layer.
 - **Десктопный интерфейс** — sidebar, conversation и details surface в нативном окне с системным tray.
-- **Терминальный режим** — интерактивный `avti`, one-shot задачи, streaming-ответы, tool activity, approvals и вопросы пользователю.
+- **Терминальный режим** — интерактивный `avti`, one-shot задачи, streaming-ответы, tool activity, approvals, вопросы пользователю и diagnostics.
 - **Profiles** — отдельные конфигурации окружения, плагинов и runtime.
 - **Plugin Market** — встроенный каталог community-плагинов с установкой, удалением и управлением.
 - **Диагностика** — локальные логи, boot health, crash evidence, экспорт диагностики и recovery-потоки.
