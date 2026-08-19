@@ -123,13 +123,14 @@ describe('Avti CLI presentation', () => {
   })
 
   it('owns a concise Avti-facing help surface', () => {
-    expect(AVTI_CLI_HELP).toContain('Usage:\n  avti <task>')
+    expect(AVTI_CLI_HELP).toContain('Usage:\n  avti')
+    expect(AVTI_CLI_HELP).toContain('start an interactive session')
     expect(AVTI_CLI_HELP).toContain('avti --profile <name>')
     expect(AVTI_CLI_HELP).not.toContain('Usage: dsh')
   })
 
-  it('resolves help and version locally', () => {
-    expect(resolveAvtiInvocation([])).toEqual({ mode: 'help' })
+  it('resolves interactive, help and version locally', () => {
+    expect(resolveAvtiInvocation([])).toEqual({ mode: 'interactive' })
     expect(resolveAvtiInvocation(['--help'])).toEqual({ mode: 'help' })
     expect(resolveAvtiInvocation(['-h'])).toEqual({ mode: 'help' })
     expect(resolveAvtiInvocation(['--version'])).toEqual({ mode: 'version' })
