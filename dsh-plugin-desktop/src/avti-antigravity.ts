@@ -33,8 +33,8 @@ export const AVTI_ANTIGRAVITY_MODELS = [
 ] as const
 
 function yamlModel(model: (typeof AVTI_ANTIGRAVITY_MODELS)[number]): string {
-  const maxTokens = 'maxTokens' in model ? `\n          maxTokens: ${model.maxTokens}` : ''
-  return `        - id: ${model.id}\n          name: ${model.id}\n          contextWindow: ${model.contextWindow}${maxTokens}`
+  const maxTokens = 'maxTokens' in model ? `\n            maxTokens: ${model.maxTokens}` : ''
+  return `          - id: ${model.id}\n            name: ${model.id}\n            contextWindow: ${model.contextWindow}${maxTokens}`
 }
 
 /**
