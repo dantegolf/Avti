@@ -5,6 +5,13 @@ import type { Agent, ModelSelection, ModelSelectionRef } from '@deepseek-ai/dsh-
 import type {} from '@deepseek-ai/dsh-commands'
 import type {} from '@deepseek-ai/dsh-session-query'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import { AVTI_COMMAND_SUGGESTIONS } from './avti-command-palette.ts'
+import {
+  AVTI_THEMES,
+  resolveAvtiTheme,
+  saveAvtiTheme,
+  type AvtiThemeRef,
+} from './avti-theme.ts'
 
 export interface AvtiSessionControlContext {
   readonly ctx: Context
@@ -12,6 +19,7 @@ export interface AvtiSessionControlContext {
   readonly selection: ModelSelectionRef
   readonly defaultSelection: ModelSelection
   readonly saveSelection: (next: ModelSelection) => Promise<void>
+  readonly theme: AvtiThemeRef
 }
 
 export type AvtiSessionControlResult = 'handled' | 'exit' | 'unhandled'
@@ -72,7 +80,7 @@ async function renderModels(context: AvtiSessionControlContext, providerFilter?:
 async function switchModel(context: AvtiSessionControlContext, args: readonly string[]): Promise<void> {
   const selected = currentAvtiSelection(context)
   if (args.length === 0) {
-    process.stdout.write(`\n  ${selected.provider} · ${selected.model}\n\n`)
+    process.stdout.write(`\n  ${selected.provider} · ${selected.model}\n  Run /models to browse the registered catalog.\n\n`)
     return
   }
   const llm = context.ctx.get('llm')
@@ -92,6 +100,31 @@ async function switchModel(context: AvtiSessionControlContext, args: readonly st
     process.stdout.write(`\n  ✓ Model · ${resolved.name} (${resolved.provider}/${resolved.id})\n\n`)
   } catch (error: unknown) {
     process.stdout.write(`\n  × Could not select model: ${error instanceof Error ? error.message : String(error)}\n\n`)
+  }
+}
+
+function switchTheme(context: AvtiSessionControlContext, requested?: string): void {
+  if (requested === undefined || requested.trim() === '') {
+    process.stdout.write('\n  Themes\n')
+    for (const theme of AVTI_THEMES) {
+      const mark = context.theme.current.id === theme.id ? '›' : ' '
+      process.stdout.write(`  ${mark} ${theme.id.padEnd(10)} ${theme.name} · ${theme.description}\n`)
+    }
+    process.stdout.write('\n  Change with: /theme <name>\n\n')
+    return
+  }
+
+  const candidate = resolveAvtiTheme(requested.trim())
+  if (candidate === undefined) {
+    process.stdout.write(`\n  × Unknown theme: ${requested}\n  Run /theme to see available themes.\n\n`)
+    return
+  }
+
+  try {
+    context.theme.current = saveAvtiTheme(candidate.id)
+    process.stdout.write(`\n  ✓ Theme · ${candidate.name} (${candidate.id})\n\n`)
+  } catch (error: unknown) {
+    process.stdout.write(`\n  × Could not save theme: ${error instanceof Error ? error.message : String(error)}\n\n`)
   }
 }
 
@@ -120,21 +153,15 @@ async function renderSessions(context: AvtiSessionControlContext): Promise<void>
 }
 
 function renderHelp(context: AvtiSessionControlContext): void {
-  process.stdout.write([
-    '',
-    '  Avti',
-    '  /status                 show project, model and session',
-    '  /models [provider]      list available models',
-    '  /model                  show current model',
-    '  /model <model>          switch model on current provider',
-    '  /model <provider> <id>  switch provider and model',
-    '  /sessions               show recent project sessions',
-    '  /exit                   leave Avti',
-  ].join('\n'))
+  process.stdout.write('\n  Avti\n')
+  for (const command of AVTI_COMMAND_SUGGESTIONS) {
+    const input = command.hint === undefined ? '' : ` ${command.hint}`
+    process.stdout.write(`  ${command.command}${input}  ${command.description}\n`)
+  }
 
   const native = context.ctx.get('commands')?.list(context.agent) ?? []
   if (native.length > 0) {
-    process.stdout.write('\n\n  Harness\n')
+    process.stdout.write('\n  Harness\n')
     for (const command of native) {
       const input = command.input?.hint === undefined ? '' : ` ${command.input.hint}`
       process.stdout.write(`  /${command.name}${input}  ${command.description}\n`)
@@ -189,6 +216,7 @@ export async function handleAvtiSessionControl(
         `  Provider   ${selected.provider}`,
         `  Model      ${selected.model}`,
         ...(selected.reasoningEffort === undefined ? [] : [`  Reasoning  ${String(selected.reasoningEffort)}`]),
+        `  Theme      ${context.theme.current.id}`,
         `  Session    ${String(context.agent.id)}`,
         `  Permission ${process.env.DSH_PERMISSION_MODE ?? 'workspace-write'}`,
         '',
@@ -203,6 +231,9 @@ export async function handleAvtiSessionControl(
       return 'handled'
     case '/sessions':
       await renderSessions(context)
+      return 'handled'
+    case '/theme':
+      switchTheme(context, args[0])
       return 'handled'
     default: {
       const native = await executeNativeCommand(trimmed, context)
