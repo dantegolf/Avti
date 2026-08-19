@@ -159,7 +159,7 @@ export function createAvtiActivity(options: AvtiActivityOptions = {}): AvtiActiv
 
 /**
  * Render the tiny Avti startup reveal.
- * Non-interactive output receives a single static wordmark and no control sequences.
+ * Pipes and CI stay byte-clean so one-shot output remains automation-friendly.
  */
 export async function renderAvtiIntro(options: AvtiMotionOptions = {}): Promise<void> {
   const output = options.output ?? process.stdout
@@ -167,6 +167,7 @@ export async function renderAvtiIntro(options: AvtiMotionOptions = {}): Promise<
   const frameDelayMs = options.frameDelayMs ?? 55
   const sleep = options.sleep ?? defaultSleep
 
+  if (output.isTTY !== true || environment.CI !== undefined) return
   if (!terminalMotionEnabled(output, environment)) {
     output.write('AVTI\n\n')
     return
