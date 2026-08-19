@@ -38,19 +38,24 @@ const INTERACTIVE_PATCH = `# Avti terminal owns the human-facing loop; Harness k
   disabled: true
 `
 
+interface ProcessShutdown {
+  shutdown(code: number): Promise<void>
+}
+
 interface ProfileBootModule {
   runProfile(options: {
     environment: ReturnType<typeof loadLayeredEnv>
     profile: string
     patchFiles: readonly string[]
     args: readonly string[]
-  }): Promise<{ ctx: Context }>
+  }): Promise<{ ctx: Context; shutdown: ProcessShutdown }>
 }
 
 interface TurnPresentationState {
   streamedText: boolean
   endsWithNewline: boolean
   turnError?: string
+  readonly toolNames: Map<string, string>
 }
 
 interface InteractiveUi {
@@ -69,16 +74,28 @@ function assistantText(event: SessionEvent<'assistant/message'>): string {
     .join('')
 }
 
-function showActivity(activity: AvtiActivity, label: string): void {
+function prepareActivityLine(state: TurnPresentationState): void {
+  if (state.streamedText && !state.endsWithNewline) {
+    process.stdout.write('\n')
+    state.endsWithNewline = true
+  }
+}
+
+function showActivity(activity: AvtiActivity, label: string, state: TurnPresentationState): void {
+  prepareActivityLine(state)
   activity.update(label)
   activity.start(label)
 }
 
-async function askTerminal(ui: InteractiveUi, prompt: string): Promise<string> {
+async function askTerminal(ui: InteractiveUi, prompt: string, signal?: AbortSignal): Promise<string> {
   ui.activity?.stop()
-  const answer = await ui.readline.question(prompt)
-  ui.activity?.start('Thinking')
-  return answer
+  try {
+    return signal === undefined
+      ? await ui.readline.question(prompt)
+      : await ui.readline.question(prompt, { signal })
+  } finally {
+    if (signal?.aborted !== true) ui.activity?.start('Thinking')
+  }
 }
 
 function renderQuestion(question: AskUserQuestionItem): void {
@@ -141,7 +158,7 @@ async function answerUserQuestions(
       : question.multiSelect === true
         ? '  Choose numbers (comma-separated) or type an answer: '
         : '  Choose a number or type an answer: '
-    const raw = await askTerminal(ui, hint)
+    const raw = await askTerminal(ui, hint, request.signal)
     answers.push(parseQuestionAnswer(question, raw))
   }
   process.stdout.write('\n')
@@ -151,7 +168,7 @@ async function answerUserQuestions(
 async function answerApproval(ui: InteractiveUi, request: ApprovalRequest): Promise<'allowed-once' | 'rejected'> {
   process.stdout.write(`\n  Permission required · ${request.toolName}\n`)
   if (request.reason !== undefined && request.reason !== '') process.stdout.write(`  ${request.reason}\n`)
-  const answer = (await askTerminal(ui, '  Allow once? [y/N] ')).trim().toLowerCase()
+  const answer = (await askTerminal(ui, '  Allow once? [y/N] ', request.signal)).trim().toLowerCase()
   process.stdout.write('\n')
   return answer === 'y' || answer === 'yes' ? 'allowed-once' : 'rejected'
 }
@@ -184,13 +201,13 @@ function renderSessionEvent(
         state.endsWithNewline = chunk.text.endsWith('\n')
         return
       case 'reasoning-delta':
-        showActivity(activity, 'Thinking')
+        showActivity(activity, 'Thinking', state)
         return
       case 'tool-call-delta':
-        if (chunk.name !== undefined && chunk.name !== '') showActivity(activity, `Using ${chunk.name}`)
+        if (chunk.name !== undefined && chunk.name !== '') showActivity(activity, `Using ${chunk.name}`, state)
         return
       case 'block-start':
-        if (chunk.blockType === 'reasoning') showActivity(activity, 'Thinking')
+        if (chunk.blockType === 'reasoning') showActivity(activity, 'Thinking', state)
         return
       case 'block-end':
       case 'usage':
@@ -200,7 +217,22 @@ function renderSessionEvent(
   }
 
   if (event.type === 'tool/call') {
-    showActivity(activity, `Using ${event.data.name}`)
+    const callId = String(event.data.callId)
+    state.toolNames.set(callId, event.data.name)
+    showActivity(activity, `Using ${event.data.name}`, state)
+    return
+  }
+
+  if (event.type === 'tool/result') {
+    prepareActivityLine(state)
+    const callId = String(event.data.message.source.callId)
+    const name = state.toolNames.get(callId)
+    if (name !== undefined) {
+      if (event.data.error === undefined) activity.succeed(name)
+      else activity.fail(name)
+      state.toolNames.delete(callId)
+      state.endsWithNewline = true
+    }
     return
   }
 
@@ -225,7 +257,11 @@ function renderSessionEvent(
 async function presentTurn(agent: Agent, firstEventIndex: number, ui: InteractiveUi): Promise<void> {
   const activity = createAvtiActivity()
   ui.activity = activity
-  const state: TurnPresentationState = { streamedText: false, endsWithNewline: false }
+  const state: TurnPresentationState = {
+    streamedText: false,
+    endsWithNewline: false,
+    toolNames: new Map(),
+  }
   let eventIndex = firstEventIndex
   let settled = false
   const idle = agent.whenIdle().finally(() => { settled = true })
@@ -259,19 +295,18 @@ async function presentTurn(agent: Agent, firstEventIndex: number, ui: Interactiv
   }
 }
 
-async function bootInteractiveProfile(): Promise<Context> {
+async function bootInteractiveProfile(): Promise<{ ctx: Context; shutdown: ProcessShutdown }> {
   const root = mkdtempSync(join(tmpdir(), 'avti-cli-'))
   const patchPath = join(root, 'interactive.patch.yml')
   writeFileSync(patchPath, INTERACTIVE_PATCH)
   try {
     const module = await import(PROFILE_BOOT_URL) as unknown as ProfileBootModule
-    const { ctx } = await module.runProfile({
+    return await module.runProfile({
       environment: loadLayeredEnv('dsh'),
       profile: 'headless',
       patchFiles: [patchPath],
       args: [],
     })
-    return ctx
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
@@ -283,9 +318,14 @@ export async function runAvtiInteractive(): Promise<void> {
     throw new Error('interactive mode requires a terminal; pass a task as an argument for one-shot mode')
   }
 
-  const ctx = await bootInteractiveProfile()
+  const { ctx, shutdown } = await bootInteractiveProfile()
   let handle: AgentHandle | undefined
-  const readline = createInterface({ input: process.stdin, output: process.stdout, terminal: true })
+  const readline = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    terminal: true,
+    historySize: 100,
+  })
   const ui: InteractiveUi = { readline }
 
   try {
@@ -338,6 +378,6 @@ export async function runAvtiInteractive(): Promise<void> {
     ui.activity?.stop()
     readline.close()
     if (handle !== undefined) await handle.dispose()
-    await ctx.fiber.dispose()
+    await shutdown.shutdown(0)
   }
 }
