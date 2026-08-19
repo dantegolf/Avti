@@ -14,6 +14,7 @@
     "../dsh-plugin-desktop/src/avti-cli.ts",
     "../dsh-plugin-desktop/src/avti-control.ts",
     "../dsh-plugin-desktop/src/avti-interactive.ts",
+    "../dsh-plugin-desktop/src/avti-profile-boot.ts",
     "../dsh-plugin-desktop/src/avti-session-controls.ts",
     "../dsh-plugin-desktop/src/avti-terminal-style.ts",
     "../dsh-plugin-desktop/src/avti-tool-presentation.ts",
