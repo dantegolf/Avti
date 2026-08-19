@@ -15,32 +15,47 @@ if (process.platform !== 'darwin' || artifactArch === undefined) {
 
 const outputRoot = join(distRoot, `avti-macos-${artifactArch}`)
 const appRoot = join(outputRoot, 'app')
-const focusedNodeModules = join(packageRoot, 'node_modules')
+const runtimeNodeModules = join(repoRoot, 'dsh-plugin-desktop', 'node_modules')
 const libRoot = join(packageRoot, 'lib')
 
 if (!existsSync(join(libRoot, 'avti.js'))) {
   throw new Error('Avti CLI build output is missing; run the build before packaging')
 }
-if (!existsSync(focusedNodeModules)) {
-  throw new Error('Avti CLI production node_modules is missing; run `yarn workspaces focus avti-cli --production` first')
-}
-if (existsSync(join(focusedNodeModules, 'electron'))) {
-  throw new Error('Standalone Avti CLI production tree unexpectedly contains Electron')
-}
-if (existsSync(join(focusedNodeModules, 'dsh-plugin-desktop'))) {
-  throw new Error('Standalone Avti CLI production tree unexpectedly contains dsh-plugin-desktop')
+if (!existsSync(runtimeNodeModules)) {
+  throw new Error('Harness runtime node_modules is missing; run `yarn install` before packaging')
 }
 
 const packageJson = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'))
+if (packageJson.dependencies?.electron !== undefined || packageJson.peerDependencies?.electron !== undefined) {
+  throw new Error('Avti CLI package metadata must not depend on Electron')
+}
+if (packageJson.dependencies?.['dsh-plugin-desktop'] !== undefined) {
+  throw new Error('Avti CLI package metadata must not depend on dsh-plugin-desktop')
+}
 
 rmSync(outputRoot, { recursive: true, force: true })
 mkdirSync(appRoot, { recursive: true })
 
-cpSync(focusedNodeModules, join(appRoot, 'node_modules'), {
+// Harness rc.7 expects a host-provided peer/runtime closure. Reuse the repository's
+// already verified Desktop Harness dependency tree, but never ship the Desktop shell
+// or Electron itself in the standalone CLI artifact.
+const packagedNodeModules = join(appRoot, 'node_modules')
+cpSync(runtimeNodeModules, packagedNodeModules, {
   recursive: true,
   dereference: true,
   force: true,
 })
+rmSync(join(packagedNodeModules, 'electron'), { recursive: true, force: true })
+rmSync(join(packagedNodeModules, 'dsh-plugin-desktop'), { recursive: true, force: true })
+rmSync(join(packagedNodeModules, '.bin', 'electron'), { force: true })
+
+if (existsSync(join(packagedNodeModules, 'electron'))) {
+  throw new Error('Standalone Avti CLI runtime unexpectedly contains Electron')
+}
+if (existsSync(join(packagedNodeModules, 'dsh-plugin-desktop'))) {
+  throw new Error('Standalone Avti CLI runtime unexpectedly contains dsh-plugin-desktop')
+}
+
 cpSync(libRoot, join(appRoot, 'lib'), { recursive: true, force: true })
 copyFileSync(join(packageRoot, 'package.json'), join(appRoot, 'package.json'))
 
