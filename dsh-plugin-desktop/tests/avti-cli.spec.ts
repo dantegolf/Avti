@@ -9,7 +9,9 @@ import {
   AVTI_INTRO_FRAMES,
   AVTI_ORBIT_FRAMES,
   AVTI_PULSE_FRAMES,
+  createAvtiActivity,
   formatAvtiActivity,
+  formatAvtiFailure,
   formatAvtiSuccess,
   renderAvtiIntro,
   terminalMotionEnabled,
@@ -22,6 +24,7 @@ describe('Avti CLI presentation', () => {
     expect(AVTI_PULSE_FRAMES).toHaveLength(8)
     expect(formatAvtiActivity('◜', 'Reading project')).toBe('  ◜ Reading project')
     expect(formatAvtiSuccess('Done')).toBe('  ✓ Done')
+    expect(formatAvtiFailure('Command failed')).toBe('  × Command failed')
   })
 
   it('disables cursor motion outside an interactive terminal', () => {
@@ -66,6 +69,57 @@ describe('Avti CLI presentation', () => {
     expect(output).toContain('AVTI')
     expect(output.endsWith('\n\n')).toBe(true)
     expect(sleep).toHaveBeenCalledTimes(3)
+  })
+
+  it('owns only transient cursor animation and leaves event meaning to the caller', () => {
+    let output = ''
+    let tick: (() => void) | undefined
+    const clear = vi.fn()
+    const activity = createAvtiActivity({
+      output: {
+        isTTY: true,
+        write(chunk: string) {
+          output += chunk
+          return true
+        },
+      },
+      environment: {},
+      setInterval(callback) {
+        tick = callback
+        return 1 as unknown as ReturnType<typeof setInterval>
+      },
+      clearInterval: clear,
+    })
+
+    activity.start('Reading project')
+    tick?.()
+    activity.update('Running tests')
+    activity.succeed('Tests passed')
+
+    expect(output).toContain('◜ Reading project')
+    expect(output).toContain('◝ Reading project')
+    expect(output).toContain('Running tests')
+    expect(output).toContain('✓ Tests passed')
+    expect(clear).toHaveBeenCalledOnce()
+  })
+
+  it('falls back to stable lines when cursor animation is unavailable', () => {
+    let output = ''
+    const activity = createAvtiActivity({
+      output: {
+        isTTY: false,
+        write(chunk: string) {
+          output += chunk
+          return true
+        },
+      },
+      environment: {},
+    })
+
+    activity.start('Reading project')
+    activity.fail('Could not read project')
+
+    expect(output).toBe('  · Reading project\n  × Could not read project\n')
   })
 
   it('owns a concise Avti-facing help surface', () => {
