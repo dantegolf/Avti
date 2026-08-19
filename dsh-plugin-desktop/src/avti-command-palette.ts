@@ -86,12 +86,17 @@ function clearPalette(output: NodeJS.WriteStream): void {
   output.write(`${SAVE_CURSOR}${MOVE_DOWN}\r${CLEAR_DOWN}${RESTORE_CURSOR}`)
 }
 
+function currentReadlineLine(readline: Interface): string {
+  const value = (readline as Interface & { readonly line?: unknown }).line
+  return typeof value === 'string' ? value : ''
+}
+
 function renderPalette(options: AvtiSlashPaletteOptions): void {
   const output = options.output ?? process.stdout
   const input = options.input ?? process.stdin
   if (output.isTTY !== true || input.isTTY !== true) return
 
-  const suggestions = filterAvtiCommandSuggestions(options.readline.line, options.getSuggestions())
+  const suggestions = filterAvtiCommandSuggestions(currentReadlineLine(options.readline), options.getSuggestions())
   clearPalette(output)
   if (suggestions.length === 0) return
 
@@ -104,6 +109,10 @@ function renderPalette(options: AvtiSlashPaletteOptions): void {
   })
 
   output.write(`${SAVE_CURSOR}${MOVE_DOWN}\r${rows.join('\n')}\n${RESTORE_CURSOR}`)
+}
+
+function formatPromptFailure(cause: unknown): string {
+  return cause instanceof Error ? cause.stack ?? cause.message : String(cause)
 }
 
 /**
@@ -119,23 +128,46 @@ export async function questionWithAvtiSlashPalette(
   const output = options.output ?? process.stdout
   let scheduled = false
   let active = true
+  let keypressAttached = false
 
   const scheduleRender = (): void => {
     if (!active || scheduled) return
     scheduled = true
     setImmediate(() => {
       scheduled = false
-      if (active) renderPalette(options)
+      if (!active) return
+      try {
+        renderPalette(options)
+      } catch (cause) {
+        active = false
+        process.stderr.write(`avti: slash palette failed: ${formatPromptFailure(cause)}\n`)
+      }
     })
   }
 
-  if (input.isTTY === true && output.isTTY === true) input.on('keypress', scheduleRender)
+  if (input.isTTY === true && output.isTTY === true) {
+    try {
+      input.on('keypress', scheduleRender)
+      keypressAttached = true
+    } catch (cause) {
+      process.stderr.write(`avti: slash palette disabled: ${formatPromptFailure(cause)}\n`)
+    }
+  }
+
   try {
-    const answer = await options.readline.question(prompt)
-    return answer
+    return await options.readline.question(prompt)
+  } catch (cause) {
+    process.stderr.write(`avti: interactive prompt failed: ${formatPromptFailure(cause)}\n`)
+    throw cause
   } finally {
     active = false
-    input.off('keypress', scheduleRender)
-    if (output.isTTY === true) clearPalette(output)
+    if (keypressAttached) input.off('keypress', scheduleRender)
+    if (output.isTTY === true) {
+      try {
+        clearPalette(output)
+      } catch {
+        // Terminal cleanup must never hide the underlying prompt result/error.
+      }
+    }
   }
 }
