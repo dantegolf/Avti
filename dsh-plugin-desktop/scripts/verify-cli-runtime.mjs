@@ -15,6 +15,7 @@ const dshAppBootPackage = fileURLToPath(new URL('node_modules/@deepseek-ai/dsh-a
 const dshAtomicWritePackage = fileURLToPath(new URL('node_modules/@deepseek-ai/dsh-atomic-write/', packageRoot))
 const dshPackage = fileURLToPath(new URL('node_modules/@deepseek-ai/dsh/', packageRoot))
 const pnpmCli = fileURLToPath(new URL('node_modules/pnpm/bin/pnpm.mjs', packageRoot))
+const avtiVersion = JSON.parse(readFileSync(new URL('package.json', packageRoot), 'utf8')).version
 const dshVersion = JSON.parse(readFileSync(new URL('node_modules/@deepseek-ai/dsh/package.json', packageRoot), 'utf8')).version
 const pnpmVersion = JSON.parse(readFileSync(new URL('node_modules/pnpm/package.json', packageRoot), 'utf8')).version
 const electronVersion = JSON.parse(readFileSync(new URL('node_modules/electron/package.json', packageRoot), 'utf8')).version
@@ -185,6 +186,6 @@ function runFlatProfileDshEntry() {
 }
 
 runElectronEntry('dsh', ['--expose-internals'], desktopCli, ['--version'], dshVersion)
-runElectronEntry('avti', ['--expose-internals'], avtiCli, ['--version'], dshVersion)
+runElectronEntry('avti', ['--expose-internals'], avtiCli, ['--version'], avtiVersion)
 runFlatProfileDshEntry()
 runPackagedPnpmShim()
