@@ -88,7 +88,7 @@ describe('Avti CLI presentation', () => {
     expect(output).toContain('A')
     expect(output).toContain('AVTI')
     expect(output.endsWith('\n\n')).toBe(true)
-    expect(sleep).toHaveBeenCalledTimes(3)
+    expect(sleep).toHaveBeenCalledTimes(4)
   })
 
   it('owns only transient cursor animation and leaves event meaning to the caller', () => {
