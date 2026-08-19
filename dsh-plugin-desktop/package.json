@@ -15,6 +15,7 @@
   "main": "lib/main.js",
   "types": "lib/types/index.d.ts",
   "bin": {
+    "avti": "lib/avti.js",
     "dsh-desktop": "lib/bin.js",
     "dsh-plugin-desktop": "lib/bin.js"
   },
