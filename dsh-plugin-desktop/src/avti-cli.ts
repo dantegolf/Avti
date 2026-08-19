@@ -1,13 +1,20 @@
 /** Thin Avti-branded entrypoint over the existing DeepSeek Harness CLI runtime. */
 
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { clearElectronRunAsNode } from './desktop-cli.ts'
 import { packagedDependencyPath } from './packaged-runtime-path.ts'
 import { renderAvtiIntro } from './avti-terminal-style.ts'
 
+const RUN_AS_NODE = 'ELECTRON_RUN_AS_NODE'
 const DSH_ENTRY_URL = pathToFileURL(
   packagedDependencyPath(import.meta.url, '@deepseek-ai/dsh/lib/bin.js'),
 ).href
+
+/** Remove Electron Node mode before Harness creates child processes. */
+export function clearAvtiElectronRunAsNode(environment: NodeJS.ProcessEnv): void {
+  for (const key of Object.keys(environment)) {
+    if (key.toUpperCase() === RUN_AS_NODE) delete environment[key]
+  }
+}
 
 /** Global launcher modes should stay byte-for-byte upstream and skip decorative startup output. */
 export function shouldRenderAvtiIntro(argv: readonly string[]): boolean {
@@ -28,7 +35,7 @@ export async function runAvtiCli(
   load: (url: string) => Promise<unknown> = url => import(url),
   argv: string[] = process.argv,
 ): Promise<void> {
-  clearElectronRunAsNode(environment)
+  clearAvtiElectronRunAsNode(environment)
 
   if (shouldRenderAvtiIntro(argv.slice(2))) {
     await renderAvtiIntro({ output: process.stdout, environment })
