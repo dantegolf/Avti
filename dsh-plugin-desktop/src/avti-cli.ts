@@ -2,6 +2,7 @@
 
 import { readFileSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { runAvtiControl } from './avti-control.ts'
 import { runAvtiInteractive } from './avti-interactive.ts'
 import { packagedDependencyPath } from './packaged-runtime-path.ts'
 import { renderAvtiIntro } from './avti-terminal-style.ts'
@@ -11,11 +12,17 @@ const DSH_ENTRY_URL = pathToFileURL(
   packagedDependencyPath(import.meta.url, '@deepseek-ai/dsh/lib/bin.js'),
 ).href
 
+const AVTI_CONTROL_COMMANDS = new Set(['status', 'models', 'model', 'sessions'])
+
 export const AVTI_CLI_HELP = `AVTI
 
 Usage:
   avti                            start an interactive session in this project
   avti <task>                     run one task and exit
+  avti status                     show project and default model
+  avti models [provider]          list available models
+  avti model [provider] <model>   show or change the shared default model
+  avti sessions                   list recent sessions for this project
   avti --profile <name> [args]    boot an Avti profile
   avti web [args]                 boot the web profile
   avti plugin [args]              manage profile plugins
@@ -31,6 +38,10 @@ Interactive commands:
 Examples:
   avti
   avti "run the tests and fix failures"
+  avti status
+  avti models
+  avti model deepseek-official deepseek-v4-flash
+  avti sessions
   avti --profile headless "explain this project"
   avti web
 `
@@ -45,7 +56,13 @@ export interface AvtiLocalInvocation {
   readonly mode: 'interactive' | 'help' | 'version'
 }
 
-export type AvtiInvocation = AvtiHarnessInvocation | AvtiLocalInvocation
+export interface AvtiControlInvocation {
+  readonly mode: 'control'
+  readonly command: string
+  readonly args: string[]
+}
+
+export type AvtiInvocation = AvtiHarnessInvocation | AvtiLocalInvocation | AvtiControlInvocation
 
 /** Remove Electron Node mode before Harness creates child processes. */
 export function clearAvtiElectronRunAsNode(environment: NodeJS.ProcessEnv): void {
@@ -82,6 +99,9 @@ export function resolveAvtiInvocation(args: readonly string[]): AvtiInvocation {
   if (args.length === 1 && (args[0] === '-V' || args[0] === '--version')) return { mode: 'version' }
 
   const first = args[0]!
+  if (AVTI_CONTROL_COMMANDS.has(first)) {
+    return { mode: 'control', command: first, args: args.slice(1) }
+  }
   if (isExplicitHarnessFrontDoor(first) || first.startsWith('-')) {
     const profileIndex = args.findIndex(argument => argument === '--profile')
     const explicitHeadless = args.some(argument => argument === '--profile=headless')
@@ -115,6 +135,10 @@ export async function runAvtiCli(
   }
   if (invocation.mode === 'version') {
     process.stdout.write(`${packageVersion()}\n`)
+    return
+  }
+  if (invocation.mode === 'control') {
+    await runAvtiControl(invocation.command, invocation.args)
     return
   }
   if (invocation.mode === 'interactive') {
