@@ -61,6 +61,15 @@ fi
 rm -rf "$INSTALL_ROOT"
 mkdir -p "$(dirname "$INSTALL_ROOT")"
 mv "$SOURCE" "$INSTALL_ROOT"
+
+# GitHub-downloaded unsigned test builds can carry com.apple.quarantine on
+# every executable/native addon. Walk regular files only so stale .bin
+# symlinks cannot interrupt cleanup. Signed/notarized builds simply have
+# nothing to remove here.
+if command -v xattr >/dev/null 2>&1; then
+  find "$INSTALL_ROOT" -type f -exec xattr -d com.apple.quarantine {} \; 2>/dev/null || true
+fi
+
 mkdir -p "$BIN_DIR"
 ln -sfn "$INSTALL_ROOT/avti" "$BIN_DIR/avti"
 
