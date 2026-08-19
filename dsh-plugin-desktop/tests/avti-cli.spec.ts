@@ -16,6 +16,11 @@ import {
   renderAvtiIntro,
   terminalMotionEnabled,
 } from '../src/avti-terminal-style.ts'
+import {
+  AVTI_THEMES,
+  formatAvtiPrompt,
+  resolveAvtiTheme,
+} from '../src/avti-theme.ts'
 
 describe('Avti CLI presentation', () => {
   it('keeps the motion language small and deterministic', () => {
@@ -137,10 +142,18 @@ describe('Avti CLI presentation', () => {
     expect(output).toBe('  · Reading project\n  × Could not read project\n')
   })
 
+  it('offers persistent terminal themes with a Claude-like warm default', () => {
+    expect(AVTI_THEMES.map(theme => theme.id)).toEqual(['claude', 'midnight', 'forest', 'mono'])
+    expect(resolveAvtiTheme('CLAUDE')?.name).toBe('Claude Warm')
+    expect(formatAvtiPrompt(AVTI_THEMES[0]!, { isTTY: false }, {})).toBe('› ')
+  })
+
   it('owns a concise Avti-facing help surface', () => {
     expect(AVTI_CLI_HELP).toContain('Usage:\n  avti')
     expect(AVTI_CLI_HELP).toContain('start an interactive session')
     expect(AVTI_CLI_HELP).toContain('avti --profile <name>')
+    expect(AVTI_CLI_HELP).toContain('/theme [name]')
+    expect(AVTI_CLI_HELP).toContain('avti models antigravity')
     expect(AVTI_CLI_HELP).not.toContain('Usage: dsh')
   })
 
@@ -165,7 +178,7 @@ describe('Avti CLI presentation', () => {
     })
   })
 
-  it('passes explicit Harness launcher modes through unchanged', () => {
+  it('passes explicit Harness launcher modes through unchanged before overlays', () => {
     expect(resolveAvtiInvocation(['web'])).toEqual({
       mode: 'harness',
       args: ['web'],
@@ -200,19 +213,33 @@ describe('Avti CLI presentation', () => {
     expect(environment).toEqual({ Path: 'C:\\Windows' })
   })
 
-  it('loads the existing Harness entry without changing explicit profile arguments', async () => {
+  it('adds the Avti provider overlay without rewriting explicit profile arguments', async () => {
     const environment = {
       ELECTRON_RUN_AS_NODE: '1',
+      AVTI_CLI_HOME: '/tmp/avti-test',
       KEEP: 'value',
     }
     const argv = [process.execPath, '/app/avti.js', '--profile', 'web']
+    const prepareProviderPatch = vi.fn(() => '/tmp/antigravity.patch.yml')
     const load = vi.fn(async (url: string) => {
-      expect(environment).toEqual({ KEEP: 'value' })
-      expect(argv).toEqual([process.execPath, '/app/avti.js', '--profile', 'web'])
+      expect(environment).toEqual({
+        AVTI_CLI_HOME: '/tmp/avti-test',
+        DSH_HOME: '/tmp/avti-test',
+        KEEP: 'value',
+      })
+      expect(argv).toEqual([
+        process.execPath,
+        '/app/avti.js',
+        '--patch',
+        '/tmp/antigravity.patch.yml',
+        '--profile',
+        'web',
+      ])
       expect(url).toMatch(/\/node_modules\/@deepseek-ai\/dsh\/lib\/bin\.js$/u)
     })
 
-    await runAvtiCli(environment, load, argv)
+    await runAvtiCli(environment, load, argv, prepareProviderPatch)
+    expect(prepareProviderPatch).toHaveBeenCalledWith(environment)
     expect(load).toHaveBeenCalledOnce()
   })
 })
