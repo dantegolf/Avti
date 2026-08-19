@@ -14,7 +14,7 @@ const libRoot = join(packageRoot, 'lib')
 if (process.platform !== 'win32' || process.arch !== 'x64') {
   throw new Error(`Avti CLI Windows bundle must be built on win32 x64, got ${process.platform} ${process.arch}`)
 }
-if (!existsSync(join(libRoot, 'avti.js'))) {
+if (!existsSync(join(libRoot, 'avti.js')) || !existsSync(join(libRoot, 'avti-profile-boot.js'))) {
   throw new Error('Avti CLI build output is missing; run the build before packaging')
 }
 if (!existsSync(runtimeNodeModules)) {
@@ -32,9 +32,6 @@ if (packageJson.dependencies?.['dsh-plugin-desktop'] !== undefined) {
 rmSync(outputRoot, { recursive: true, force: true })
 mkdirSync(appRoot, { recursive: true })
 
-// Harness rc.7 expects a host-provided peer/runtime closure. Reuse the repository's
-// already verified Desktop Harness dependency tree, but never ship the Desktop shell
-// or Electron itself in the standalone CLI artifact.
 const packagedNodeModules = join(appRoot, 'node_modules')
 cpSync(runtimeNodeModules, packagedNodeModules, {
   recursive: true,
@@ -56,6 +53,13 @@ if (existsSync(join(packagedNodeModules, 'dsh-plugin-desktop'))) {
 
 cpSync(libRoot, join(appRoot, 'lib'), { recursive: true, force: true })
 copyFileSync(join(packageRoot, 'package.json'), join(appRoot, 'package.json'))
+
+const dshLibRoot = join(packagedNodeModules, '@deepseek-ai', 'dsh', 'lib')
+mkdirSync(dshLibRoot, { recursive: true })
+writeFileSync(
+  join(dshLibRoot, 'profile-boot.js'),
+  "export { runProfile } from '../../../../lib/avti-profile-boot.js'\n",
+)
 
 copyFileSync(process.execPath, join(outputRoot, 'node.exe'))
 writeFileSync(join(outputRoot, 'avti.cmd'), [
