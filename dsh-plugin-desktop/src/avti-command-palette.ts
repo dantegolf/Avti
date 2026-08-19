@@ -22,6 +22,8 @@ export const AVTI_COMMAND_SUGGESTIONS: readonly AvtiCommandSuggestion[] = [
   { command: '/exit', description: 'Leave Avti', source: 'avti' },
 ] as const
 
+const AVTI_SLASH_PALETTE_LIMIT = 7
+
 /** Merge Avti commands with whatever the native Harness command registry exposes. */
 export function listAvtiCommandSuggestions(ctx: Context, agent: Agent): AvtiCommandSuggestion[] {
   const merged = new Map<string, AvtiCommandSuggestion>()
@@ -41,14 +43,19 @@ export function listAvtiCommandSuggestions(ctx: Context, agent: Agent): AvtiComm
   return [...merged.values()]
 }
 
+function isSlashPrefix(line: string): boolean {
+  const candidate = line.trimStart()
+  return candidate.startsWith('/') && !/\s/u.test(candidate)
+}
+
 /** Only show the menu while the first token is a slash-command prefix. */
 export function filterAvtiCommandSuggestions(
   line: string,
   suggestions: readonly AvtiCommandSuggestion[],
-  limit = 9,
+  limit = AVTI_SLASH_PALETTE_LIMIT,
 ): AvtiCommandSuggestion[] {
   const candidate = line.trimStart()
-  if (!candidate.startsWith('/') || /\s/u.test(candidate)) return []
+  if (!isSlashPrefix(line)) return []
   const needle = candidate.toLowerCase()
   return suggestions
     .filter(suggestion => suggestion.command.toLowerCase().startsWith(needle))
@@ -61,10 +68,29 @@ export function createAvtiSlashCompleter(
 ): (line: string) => [string[], string] {
   return line => {
     const candidate = line.trimStart()
-    if (!candidate.startsWith('/') || /\s/u.test(candidate)) return [[], line]
+    if (!isSlashPrefix(line)) return [[], line]
     const matches = filterAvtiCommandSuggestions(candidate, getSuggestions(), Number.POSITIVE_INFINITY)
     return [matches.map(match => match.command), candidate]
   }
+}
+
+export interface AvtiSlashPaletteVisibility {
+  readonly dismissed: boolean
+}
+
+/**
+ * Keep Escape dismissal sticky for the current slash token. Once the user
+ * leaves slash-command mode (empty/normal text/arguments), the next `/` can
+ * open discovery again.
+ */
+export function nextAvtiSlashPaletteVisibility(
+  state: AvtiSlashPaletteVisibility,
+  line: string,
+  keyName?: string,
+): AvtiSlashPaletteVisibility {
+  if (!isSlashPrefix(line)) return { dismissed: false }
+  if (keyName === 'escape') return { dismissed: true }
+  return state
 }
 
 const ESC = '\u001b['
@@ -91,14 +117,21 @@ function currentReadlineLine(readline: Interface): string {
   return typeof value === 'string' ? value : ''
 }
 
-function renderPalette(options: AvtiSlashPaletteOptions): void {
+function renderPalette(
+  options: AvtiSlashPaletteOptions,
+  visibility: AvtiSlashPaletteVisibility,
+): AvtiSlashPaletteVisibility {
   const output = options.output ?? process.stdout
   const input = options.input ?? process.stdin
-  if (output.isTTY !== true || input.isTTY !== true) return
+  if (output.isTTY !== true || input.isTTY !== true) return visibility
 
-  const suggestions = filterAvtiCommandSuggestions(currentReadlineLine(options.readline), options.getSuggestions())
+  const line = currentReadlineLine(options.readline)
+  const nextVisibility = nextAvtiSlashPaletteVisibility(visibility, line)
   clearPalette(output)
-  if (suggestions.length === 0) return
+  if (nextVisibility.dismissed) return nextVisibility
+
+  const suggestions = filterAvtiCommandSuggestions(line, options.getSuggestions())
+  if (suggestions.length === 0) return nextVisibility
 
   const commandWidth = Math.max(...suggestions.map(suggestion => suggestion.command.length))
   const rows = suggestions.map(suggestion => {
@@ -107,8 +140,10 @@ function renderPalette(options: AvtiSlashPaletteOptions): void {
     const source = suggestion.source === 'harness' ? ' · Harness' : ''
     return `  ${command}${hint}  ${DIM}${suggestion.description}${source}${RESET}`
   })
+  rows.push(`  ${DIM}Esc close · keep typing to filter${RESET}`)
 
   output.write(`${SAVE_CURSOR}${MOVE_DOWN}\r${rows.join('\n')}\n${RESTORE_CURSOR}`)
+  return nextVisibility
 }
 
 function formatPromptFailure(cause: unknown): string {
@@ -129,6 +164,7 @@ export async function questionWithAvtiSlashPalette(
   let scheduled = false
   let active = true
   let keypressAttached = false
+  let visibility: AvtiSlashPaletteVisibility = { dismissed: false }
 
   const scheduleRender = (): void => {
     if (!active || scheduled) return
@@ -137,7 +173,7 @@ export async function questionWithAvtiSlashPalette(
       scheduled = false
       if (!active) return
       try {
-        renderPalette(options)
+        visibility = renderPalette(options, visibility)
       } catch (cause) {
         active = false
         process.stderr.write(`avti: slash palette failed: ${formatPromptFailure(cause)}\n`)
@@ -145,9 +181,27 @@ export async function questionWithAvtiSlashPalette(
     })
   }
 
+  const onKeypress = (_character: string | undefined, key?: { readonly name?: string }): void => {
+    if (!active) return
+    const keyName = key?.name
+    const line = currentReadlineLine(options.readline)
+    visibility = nextAvtiSlashPaletteVisibility(visibility, line, keyName)
+
+    if (keyName === 'escape' && visibility.dismissed) {
+      try {
+        clearPalette(output)
+      } catch {
+        // Escape must still dismiss logically even if terminal cleanup fails.
+      }
+      return
+    }
+
+    scheduleRender()
+  }
+
   if (input.isTTY === true && output.isTTY === true) {
     try {
-      input.on('keypress', scheduleRender)
+      input.on('keypress', onKeypress)
       keypressAttached = true
     } catch (cause) {
       process.stderr.write(`avti: slash palette disabled: ${formatPromptFailure(cause)}\n`)
@@ -161,7 +215,7 @@ export async function questionWithAvtiSlashPalette(
     throw cause
   } finally {
     active = false
-    if (keypressAttached) input.off('keypress', scheduleRender)
+    if (keypressAttached) input.off('keypress', onKeypress)
     if (output.isTTY === true) {
       try {
         clearPalette(output)
