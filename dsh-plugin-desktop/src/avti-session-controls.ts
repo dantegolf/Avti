@@ -9,6 +9,7 @@ import type {} from '@deepseek-ai/dsh-session-query'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { AVTI_COMMAND_SUGGESTIONS } from './avti-command-palette.ts'
 import { runAvtiPresentation } from './avti-presentation.ts'
+import { promptAvtiSelect } from './avti-select.ts'
 import {
   AVTI_THEMES,
   BOLD,
@@ -19,6 +20,7 @@ import {
   saveAvtiTheme,
   styleAvtiSelection,
   styleAvtiTone,
+  type AvtiThemeId,
   type AvtiThemeRef,
   type AvtiTone,
 } from './avti-theme.ts'
@@ -118,15 +120,47 @@ async function renderModels(context: AvtiSessionControlContext, providerFilter?:
 
 async function switchModel(context: AvtiSessionControlContext, args: readonly string[]): Promise<void> {
   const selected = currentAvtiSelection(context)
+  const llm = context.ctx.get('llm')
+  if (llm === undefined) {
+    process.stdout.write(`\n${errorLine(context, 'Model registry is unavailable')}\n\n`)
+    return
+  }
+
+  if (args.length === 0 && process.stdin.isTTY === true) {
+    const providers = llm.listProviders()
+    const allModels: Array<{ provider: string; id: string; name: string }> = []
+    for (const p of providers) {
+      try {
+        const list = await llm.listModels(p.id)
+        for (const m of list) allModels.push({ provider: p.id, id: m.id, name: m.name })
+      } catch { /* skip failing provider */ }
+    }
+
+    if (allModels.length > 0) {
+      const defaultIndex = Math.max(0, allModels.findIndex(m => m.provider === selected.provider && m.id === selected.model))
+      const choice = await promptAvtiSelect<{ provider: string; model: string }>({
+        title: 'Model Selector',
+        options: allModels.map(m => ({
+          label: m.name,
+          value: { provider: m.provider, model: m.id },
+          description: `${m.provider}/${m.id}`,
+        })),
+        defaultIndex,
+        theme: context.theme.current,
+        footerHint: '↑↓ navigate · Enter switch model · Esc cancel',
+      })
+      if (choice === undefined) {
+        process.stdout.write(`\n${sectionEnd(context, 'cancelled')}\n\n`)
+        return
+      }
+      args = [choice.provider, choice.model]
+    }
+  }
+
   if (args.length === 0) {
     process.stdout.write(`\n${sectionTitle(context, 'Model')}\n`)
     process.stdout.write(`  ${styled(context, '│', 'subtle')} ${styled(context, `${selected.provider}/${selected.model}`, 'text')}\n`)
     process.stdout.write(`${sectionEnd(context, '/models to browse')}\n\n`)
-    return
-  }
-  const llm = context.ctx.get('llm')
-  if (llm === undefined) {
-    process.stdout.write(`\n${errorLine(context, 'Model registry is unavailable')}\n\n`)
     return
   }
 
@@ -143,7 +177,28 @@ async function switchModel(context: AvtiSessionControlContext, args: readonly st
   }
 }
 
-function switchTheme(context: AvtiSessionControlContext, requested?: string): void {
+async function switchTheme(context: AvtiSessionControlContext, requested?: string): Promise<void> {
+  if ((requested === undefined || requested.trim() === '') && process.stdin.isTTY === true) {
+    const currentId = context.theme.current.id
+    const defaultIndex = Math.max(0, AVTI_THEMES.findIndex(t => t.id === currentId))
+    const selected = await promptAvtiSelect<AvtiThemeId>({
+      title: 'Theme Selector',
+      options: AVTI_THEMES.map(theme => ({
+        label: theme.id,
+        value: theme.id,
+        description: `${theme.name} · ${theme.description}`,
+      })),
+      defaultIndex,
+      theme: context.theme.current,
+      footerHint: '↑↓ navigate · Enter apply theme · Esc cancel',
+    })
+    if (selected === undefined) {
+      process.stdout.write(`\n${sectionEnd(context, 'cancelled')}\n\n`)
+      return
+    }
+    requested = selected
+  }
+
   if (requested === undefined || requested.trim() === '') {
     process.stdout.write(`\n${sectionTitle(context, 'Themes')}\n`)
     for (const theme of AVTI_THEMES) {
@@ -180,8 +235,38 @@ async function renderSessions(context: AvtiSessionControlContext): Promise<void>
     const records = (await query.listSessions())
       .filter(record => record.persisted && record.header.cwd === process.cwd())
       .slice(0, 10)
+
+    if (records.length === 0) {
+      process.stdout.write(`\n${sectionTitle(context, 'Recent sessions')}\n`)
+      process.stdout.write(`  ${styled(context, '│', 'subtle')} ${styled(context, 'No saved sessions for this project', 'muted')}\n`)
+      process.stdout.write(`${sectionEnd(context, 'avti resume <session-id>')}\n\n`)
+      return
+    }
+
+    if (process.stdin.isTTY === true) {
+      const titles = await Promise.all(records.map(async r => {
+        const t = await query.readTitle(r.header.id).catch(() => undefined)
+        return t?.title?.trim() || String(r.header.id)
+      }))
+      const defaultIndex = Math.max(0, records.findIndex(r => r.header.id === context.agent.id))
+      const choice = await promptAvtiSelect<string>({
+        title: 'Session Browser',
+        options: records.map((r, i) => ({
+          label: titles[i] ?? String(r.header.id),
+          value: String(r.header.id),
+          description: new Date(r.header.createdAt).toLocaleString(),
+        })),
+        defaultIndex,
+        theme: context.theme.current,
+        footerHint: '↑↓ navigate · Enter view · Esc cancel',
+      })
+      if (choice !== undefined) {
+        process.stdout.write(`\n${successLine(context, `Selected session: ${choice}`)}\n  ${styled(context, `Resume from shell: avti resume ${choice}`, 'muted')}\n\n`)
+        return
+      }
+    }
+
     process.stdout.write(`\n${sectionTitle(context, 'Recent sessions')}\n`)
-    if (records.length === 0) process.stdout.write(`  ${styled(context, '│', 'subtle')} ${styled(context, 'No saved sessions for this project', 'muted')}\n`)
     for (const record of records) {
       const active = record.header.id === context.agent.id
       const title = await query.readTitle(record.header.id).catch(() => undefined)
@@ -286,7 +371,7 @@ export async function handleAvtiSessionControl(
       await renderSessions(context)
       return 'handled'
     case '/theme':
-      switchTheme(context, args[0])
+      await switchTheme(context, args[0])
       return 'handled'
     default: {
       const native = await executeNativeCommand(trimmed, context)

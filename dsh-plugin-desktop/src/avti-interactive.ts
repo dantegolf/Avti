@@ -48,6 +48,7 @@ import {
   type AvtiSessionControlContext,
 } from './avti-session-controls.ts'
 import { formatAvtiPrompt, loadAvtiTheme, type AvtiThemeRef } from './avti-theme.ts'
+import { promptAvtiSelect } from './avti-select.ts'
 import {
   avtiToolPresentation,
   type AvtiToolPresentation,
@@ -202,6 +203,22 @@ async function answerUserQuestions(
 }
 
 async function answerApproval(ui: InteractiveUi, request: ApprovalRequest): Promise<'allowed-once' | 'rejected'> {
+  ui.activity?.stop()
+  const theme = loadAvtiTheme()
+  if (process.stdin.isTTY === true && process.stdout.isTTY === true) {
+    const choice = await promptAvtiSelect<'allowed-once' | 'rejected'>({
+      title: `Permission Required · ${avtiToolPresentation(request.toolName).active}`,
+      options: [
+        { label: 'Allow once', value: 'allowed-once', description: request.reason ?? 'Execute this tool action' },
+        { label: 'Reject', value: 'rejected', description: 'Decline this permission request' },
+      ],
+      defaultIndex: 0,
+      theme,
+      footerHint: '↑↓ navigate · Enter confirm · Esc reject',
+    })
+    process.stdout.write('\n')
+    return choice ?? 'rejected'
+  }
   process.stdout.write(`\n  Permission required · ${avtiToolPresentation(request.toolName).active}\n`)
   if (request.reason !== undefined && request.reason !== '') process.stdout.write(`  ${request.reason}\n`)
   const answer = (await askTerminal(ui, '  Allow once? [y/N] ', request.signal)).trim().toLowerCase()
