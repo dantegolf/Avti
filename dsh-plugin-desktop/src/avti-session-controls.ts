@@ -251,11 +251,11 @@ export async function handleAvtiSessionControl(
       return 'handled'
     case '/status': {
       const selected = currentAvtiSelection(context)
-      const rows = [
+      const rows: Array<readonly [string, string]> = [
         ['Project', process.cwd()],
         ['Provider', selected.provider],
         ['Model', selected.model],
-        ...(selected.reasoningEffort === undefined ? [] : [['Reasoning', String(selected.reasoningEffort)]]),
+        ...(selected.reasoningEffort === undefined ? [] : [['Reasoning', String(selected.reasoningEffort)] as const]),
         ['Theme', context.theme.current.id],
         ['Session', String(context.agent.id)],
         ['Permission', process.env.DSH_PERMISSION_MODE ?? 'workspace-write'],
