@@ -151,14 +151,31 @@ jobs:
           set -euo pipefail
           archive="avti-cli-macos-${{ matrix.arch }}-0.1.4.tar.gz"
           tar -C avti-cli/dist -czf "$archive" "avti-macos-${{ matrix.arch }}"
-          tar -tzf "$archive" | grep -F "avti-macos-${{ matrix.arch }}/app/node_modules/@earendil-works/pi-ai/dist/providers/data/.manifest.json"
+
+          listing="$(mktemp)"
+          tar -tzf "$archive" > "$listing"
+          grep -Fq "avti-macos-${{ matrix.arch }}/app/node_modules/@earendil-works/pi-ai/dist/providers/data/.manifest.json" "$listing"
+
           unpack="$(mktemp -d)"
-          trap 'rm -rf "$unpack"' EXIT
+          trap 'rm -rf "$unpack" "$listing"' EXIT
           tar -xzf "$archive" -C "$unpack"
-          test "$(cat "$unpack/avti-macos-${{ matrix.arch }}/VERSION")" = "0.1.4"
-          AVTI_CLI_HOME="$unpack/home" AVTI_NO_MOTION=1 \
-            "$unpack/avti-macos-${{ matrix.arch }}/avti" models antigravity \
-            | grep -F "gemini-3.7-flash-high"
+          bundle="$unpack/avti-macos-${{ matrix.arch }}"
+
+          actual_version="$(cat "$bundle/VERSION")"
+          echo "portable version: $actual_version"
+          test "$actual_version" = "0.1.4"
+          test -f "$bundle/app/node_modules/@earendil-works/pi-ai/dist/providers/data/.manifest.json"
+
+          set +e
+          models_output="$(AVTI_CLI_HOME="$unpack/home" AVTI_NO_MOTION=1 NO_COLOR=1 "$bundle/avti" models antigravity 2>&1)"
+          models_status=$?
+          set -e
+          printf '%s\n' "$models_output"
+          test "$models_status" -eq 0
+          case "$models_output" in
+            *gemini-3.7-flash-high*) ;;
+            *) echo "portable model smoke did not expose gemini-3.7-flash-high" >&2; exit 1 ;;
+          esac
       - name: Upload standalone macOS CLI test build
         uses: actions/upload-artifact@v4
         with:
