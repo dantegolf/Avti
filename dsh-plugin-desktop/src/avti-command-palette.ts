@@ -184,14 +184,6 @@ const ERASE_LINE = `${ESC}2K`
 const HIDE_CURSOR = `${ESC}?25l`
 const SHOW_CURSOR = `${ESC}?25h`
 
-interface WritableReadline extends Interface {
-  write(data: string | null, key?: { readonly ctrl?: boolean; readonly name?: string }): void
-}
-
-interface CursorAwareReadline extends Interface {
-  getCursorPos?(): { readonly rows: number; readonly cols: number }
-}
-
 interface MutableKeypress {
   name?: string
   sequence?: string
@@ -215,17 +207,16 @@ function currentReadlineLine(readline: Interface): string {
 
 function currentCursorColumn(readline: Interface): number {
   try {
-    return (readline as CursorAwareReadline).getCursorPos?.().cols ?? 0
+    return readline.getCursorPos().cols
   } catch {
     return 0
   }
 }
 
 function replaceReadlineLine(readline: Interface, next: string): void {
-  const writable = readline as WritableReadline
-  writable.write(null, { ctrl: true, name: 'a' })
-  writable.write(null, { ctrl: true, name: 'k' })
-  writable.write(next)
+  readline.write(null, { ctrl: true, name: 'a' })
+  readline.write(null, { ctrl: true, name: 'k' })
+  readline.write(next)
 }
 
 function moveVertical(rows: number): string {
