@@ -229,7 +229,8 @@ export async function questionWithAvtiSlashPalette(
       const selected = matches[Math.min(state.selectedIndex, matches.length - 1)]!
       const candidate = line.trimStart()
       const exact = candidate === selected.command
-      if (keyName === 'tab' || !exact || selected.hint !== undefined) {
+      const completeSelected = keyName === 'tab' || !exact
+      if (completeSelected) {
         const accepted = selected.hint === undefined ? selected.command : `${selected.command} `
         replaceReadlineLine(options.readline, accepted)
         if (key !== undefined) suppressReadlineKey(key)
