@@ -44,7 +44,8 @@ describe('Avti tool presentation', () => {
           return true
         },
       },
-      environment: {},
+      environment: { NO_COLOR: '1' },
+      announceTurn: false,
       frames: AVTI_ORBIT_FRAMES,
       setInterval(callback) {
         tick = callback
@@ -74,7 +75,8 @@ describe('Avti tool presentation', () => {
           return true
         },
       },
-      environment: { AVTI_NO_MOTION: '1' },
+      environment: { AVTI_NO_MOTION: '1', NO_COLOR: '1' },
+      announceTurn: false,
     })
 
     activity.start('Thinking')
@@ -89,5 +91,26 @@ describe('Avti tool presentation', () => {
       + '  · Running command\n'
       + '  ✓ Ran command\n',
     )
+  })
+
+  it('announces an interactive turn once with the Avti identity marker', () => {
+    let output = ''
+    const activity = createAvtiActivity({
+      output: {
+        isTTY: true,
+        write(chunk: string) {
+          output += chunk
+          return true
+        },
+      },
+      environment: { AVTI_NO_MOTION: '1', NO_COLOR: '1' },
+    })
+
+    activity.start('Thinking')
+    activity.update('Reading files')
+    activity.succeed('Done')
+
+    expect(output.startsWith('◆ Avti\n')).toBe(true)
+    expect(output.match(/◆ Avti/g)).toHaveLength(1)
   })
 })

@@ -16,10 +16,21 @@ export type AvtiThemeId =
   | 'cyber-matrix'
   | 'ice-slate'
   | 'clean-mono'
+  | 'orbit'
   | 'claude'
   | 'midnight'
   | 'forest'
   | 'mono'
+
+export type AvtiTone =
+  | 'accent'
+  | 'accentBright'
+  | 'text'
+  | 'muted'
+  | 'subtle'
+  | 'success'
+  | 'warning'
+  | 'error'
 
 export interface RgbColor {
   readonly r: number
@@ -40,6 +51,8 @@ export interface AvtiTheme {
   readonly borderAnsi: string
   readonly accentRgb: RgbColor
   readonly secondaryRgb: RgbColor
+  readonly tones: Readonly<Record<AvtiTone, string>>
+  readonly selectionAnsi: string
 }
 
 export interface AvtiThemeRef {
@@ -76,6 +89,10 @@ export function hexToRgb(hex: string): RgbColor {
   }
 }
 
+function ansi256(index: number): string {
+  return `${ESC}38;5;${index}m`
+}
+
 export const AVTI_THEMES: readonly AvtiTheme[] = [
   {
     id: 'aurora',
@@ -90,6 +107,17 @@ export const AVTI_THEMES: readonly AvtiTheme[] = [
     borderAnsi: fgRgb(51, 65, 85),
     accentRgb: { r: 0, g: 245, b: 255 },
     secondaryRgb: { r: 168, g: 85, b: 247 },
+    tones: {
+      accent: fgRgb(0, 245, 255),
+      accentBright: fgRgb(103, 232, 249),
+      text: fgRgb(248, 250, 252),
+      muted: fgRgb(148, 163, 184),
+      subtle: fgRgb(100, 116, 139),
+      success: fgRgb(16, 185, 129),
+      warning: fgRgb(245, 158, 11),
+      error: fgRgb(239, 68, 68),
+    },
+    selectionAnsi: `${bgRgb(30, 41, 59)}${fgRgb(0, 245, 255)}`,
   },
   {
     id: 'antigravity',
@@ -104,6 +132,17 @@ export const AVTI_THEMES: readonly AvtiTheme[] = [
     borderAnsi: fgRgb(76, 29, 149),
     accentRgb: { r: 192, g: 38, b: 211 },
     secondaryRgb: { r: 59, g: 130, b: 246 },
+    tones: {
+      accent: fgRgb(192, 38, 211),
+      accentBright: fgRgb(232, 121, 249),
+      text: fgRgb(250, 250, 250),
+      muted: fgRgb(168, 162, 158),
+      subtle: fgRgb(120, 113, 108),
+      success: fgRgb(52, 211, 153),
+      warning: fgRgb(251, 191, 36),
+      error: fgRgb(244, 63, 94),
+    },
+    selectionAnsi: `${bgRgb(76, 29, 149)}${fgRgb(250, 250, 250)}`,
   },
   {
     id: 'solar-amber',
@@ -118,6 +157,17 @@ export const AVTI_THEMES: readonly AvtiTheme[] = [
     borderAnsi: fgRgb(120, 53, 15),
     accentRgb: { r: 245, g: 158, b: 11 },
     secondaryRgb: { r: 251, g: 191, b: 36 },
+    tones: {
+      accent: fgRgb(245, 158, 11),
+      accentBright: fgRgb(253, 224, 71),
+      text: fgRgb(254, 243, 199),
+      muted: fgRgb(217, 119, 6),
+      subtle: fgRgb(161, 98, 7),
+      success: fgRgb(34, 197, 94),
+      warning: fgRgb(234, 88, 12),
+      error: fgRgb(220, 38, 38),
+    },
+    selectionAnsi: `${bgRgb(120, 53, 15)}${fgRgb(253, 224, 71)}`,
   },
   {
     id: 'cyber-matrix',
@@ -132,6 +182,17 @@ export const AVTI_THEMES: readonly AvtiTheme[] = [
     borderAnsi: fgRgb(20, 83, 45),
     accentRgb: { r: 34, g: 197, b: 94 },
     secondaryRgb: { r: 16, g: 185, b: 129 },
+    tones: {
+      accent: fgRgb(34, 197, 94),
+      accentBright: fgRgb(74, 222, 128),
+      text: fgRgb(240, 253, 244),
+      muted: fgRgb(134, 239, 172),
+      subtle: fgRgb(75, 85, 99),
+      success: fgRgb(74, 222, 128),
+      warning: fgRgb(234, 179, 8),
+      error: fgRgb(248, 113, 113),
+    },
+    selectionAnsi: `${bgRgb(20, 83, 45)}${fgRgb(240, 253, 244)}`,
   },
   {
     id: 'ice-slate',
@@ -146,6 +207,17 @@ export const AVTI_THEMES: readonly AvtiTheme[] = [
     borderAnsi: fgRgb(51, 65, 85),
     accentRgb: { r: 56, g: 189, b: 248 },
     secondaryRgb: { r: 148, g: 163, b: 184 },
+    tones: {
+      accent: fgRgb(56, 189, 248),
+      accentBright: fgRgb(125, 211, 252),
+      text: fgRgb(241, 245, 249),
+      muted: fgRgb(148, 163, 184),
+      subtle: fgRgb(100, 116, 139),
+      success: fgRgb(45, 212, 191),
+      warning: fgRgb(251, 146, 60),
+      error: fgRgb(251, 113, 133),
+    },
+    selectionAnsi: `${bgRgb(30, 58, 138)}${fgRgb(241, 245, 249)}`,
   },
   {
     id: 'clean-mono',
@@ -160,8 +232,43 @@ export const AVTI_THEMES: readonly AvtiTheme[] = [
     borderAnsi: fgRgb(71, 85, 105),
     accentRgb: { r: 248, g: 250, b: 252 },
     secondaryRgb: { r: 203, g: 213, b: 225 },
+    tones: {
+      accent: fgRgb(248, 250, 252),
+      accentBright: fgRgb(255, 255, 255),
+      text: fgRgb(241, 245, 249),
+      muted: fgRgb(148, 163, 184),
+      subtle: fgRgb(100, 116, 139),
+      success: fgRgb(241, 245, 249),
+      warning: fgRgb(226, 232, 240),
+      error: fgRgb(255, 255, 255),
+    },
+    selectionAnsi: `${bgRgb(71, 85, 105)}${fgRgb(255, 255, 255)}`,
   },
-  // Backward-compatible themes
+  {
+    id: 'orbit',
+    name: 'Avti Orbit',
+    description: 'Minimalist monochrome with electric cyan focus',
+    accentAnsi: ansi256(51),
+    secondaryAnsi: ansi256(141),
+    successAnsi: ansi256(49),
+    warningAnsi: ansi256(214),
+    errorAnsi: ansi256(196),
+    subtleAnsi: ansi256(241),
+    borderAnsi: ansi256(238),
+    accentRgb: { r: 0, g: 245, b: 255 },
+    secondaryRgb: { r: 168, g: 85, b: 247 },
+    tones: {
+      accent: ansi256(51),
+      accentBright: ansi256(123),
+      text: ansi256(255),
+      muted: ansi256(247),
+      subtle: ansi256(241),
+      success: ansi256(49),
+      warning: ansi256(214),
+      error: ansi256(196),
+    },
+    selectionAnsi: `${ESC}48;5;236;38;5;51m`,
+  },
   {
     id: 'claude',
     name: 'Claude Warm',
@@ -175,11 +282,22 @@ export const AVTI_THEMES: readonly AvtiTheme[] = [
     borderAnsi: `${ESC}38;5;238m`,
     accentRgb: { r: 255, g: 135, b: 0 },
     secondaryRgb: { r: 215, g: 175, b: 0 },
+    tones: {
+      accent: `${ESC}38;5;208m`,
+      accentBright: `${ESC}38;5;214m`,
+      text: `${ESC}38;5;255m`,
+      muted: `${ESC}38;5;247m`,
+      subtle: `${ESC}38;5;244m`,
+      success: `${ESC}38;5;114m`,
+      warning: `${ESC}38;5;214m`,
+      error: `${ESC}38;5;196m`,
+    },
+    selectionAnsi: `${ESC}48;5;237;38;5;208m`,
   },
   {
     id: 'midnight',
-    name: 'Midnight',
-    description: 'Cool cyan accent for dark terminals',
+    name: 'Avti Midnight',
+    description: 'Cool violet and blue accents for dark terminals',
     accentAnsi: `${ESC}38;5;45m`,
     secondaryAnsi: `${ESC}38;5;39m`,
     successAnsi: `${ESC}38;5;48m`,
@@ -189,11 +307,22 @@ export const AVTI_THEMES: readonly AvtiTheme[] = [
     borderAnsi: `${ESC}38;5;236m`,
     accentRgb: { r: 0, g: 215, b: 255 },
     secondaryRgb: { r: 0, g: 175, b: 255 },
+    tones: {
+      accent: ansi256(111),
+      accentBright: ansi256(147),
+      text: ansi256(255),
+      muted: ansi256(247),
+      subtle: ansi256(241),
+      success: ansi256(79),
+      warning: ansi256(221),
+      error: ansi256(203),
+    },
+    selectionAnsi: `${ESC}48;5;236;38;5;111m`,
   },
   {
     id: 'forest',
-    name: 'Forest',
-    description: 'Muted green terminal accent',
+    name: 'Avti Forest',
+    description: 'Muted sage and forest green terminal accent',
     accentAnsi: `${ESC}38;5;114m`,
     secondaryAnsi: `${ESC}38;5;150m`,
     successAnsi: `${ESC}38;5;120m`,
@@ -203,11 +332,22 @@ export const AVTI_THEMES: readonly AvtiTheme[] = [
     borderAnsi: `${ESC}38;5;237m`,
     accentRgb: { r: 135, g: 215, b: 135 },
     secondaryRgb: { r: 175, g: 215, b: 135 },
+    tones: {
+      accent: ansi256(108),
+      accentBright: ansi256(151),
+      text: ansi256(255),
+      muted: ansi256(247),
+      subtle: ansi256(241),
+      success: ansi256(114),
+      warning: ansi256(215),
+      error: ansi256(203),
+    },
+    selectionAnsi: `${ESC}48;5;237;38;5;108m`,
   },
   {
     id: 'mono',
-    name: 'Mono',
-    description: 'No terminal color styling',
+    name: 'Avti Mono',
+    description: 'Plain text without color escapes',
     accentAnsi: '',
     secondaryAnsi: '',
     successAnsi: '',
@@ -217,6 +357,17 @@ export const AVTI_THEMES: readonly AvtiTheme[] = [
     borderAnsi: '',
     accentRgb: { r: 255, g: 255, b: 255 },
     secondaryRgb: { r: 200, g: 200, b: 200 },
+    tones: {
+      accent: '',
+      accentBright: '',
+      text: '',
+      muted: '',
+      subtle: '',
+      success: '',
+      warning: '',
+      error: '',
+    },
+    selectionAnsi: '',
   },
 ] as const
 
@@ -272,14 +423,36 @@ export function avtiTerminalColorEnabled(
   return true
 }
 
+export function styleAvtiTone(
+  text: string,
+  tone: AvtiTone,
+  theme: AvtiTheme,
+  output: { readonly isTTY?: boolean } = process.stdout,
+  environment: NodeJS.ProcessEnv = process.env,
+): string {
+  if (!avtiTerminalColorEnabled(output, environment)) return text
+  const toneAnsi = theme.tones[tone]
+  if (toneAnsi === '') return text
+  return `${toneAnsi}${text}${RESET}`
+}
+
+export function styleAvtiSelection(
+  text: string,
+  theme: AvtiTheme,
+  output: { readonly isTTY?: boolean } = process.stdout,
+  environment: NodeJS.ProcessEnv = process.env,
+): string {
+  if (!avtiTerminalColorEnabled(output, environment) || theme.selectionAnsi === '') return text
+  return `${theme.selectionAnsi}${text}${RESET}`
+}
+
 export function styleAvtiAccent(
   text: string,
   theme: AvtiTheme,
   output: { readonly isTTY?: boolean } = process.stdout,
   environment: NodeJS.ProcessEnv = process.env,
 ): string {
-  if (theme.accentAnsi === '' || !avtiTerminalColorEnabled(output, environment)) return text
-  return `${theme.accentAnsi}${text}${RESET}`
+  return styleAvtiTone(text, 'accent', theme, output, environment)
 }
 
 export function styleAvtiSecondary(
@@ -298,8 +471,7 @@ export function styleAvtiSubtle(
   output: { readonly isTTY?: boolean } = process.stdout,
   environment: NodeJS.ProcessEnv = process.env,
 ): string {
-  if (theme.subtleAnsi === '' || !avtiTerminalColorEnabled(output, environment)) return text
-  return `${theme.subtleAnsi}${text}${RESET}`
+  return styleAvtiTone(text, 'subtle', theme, output, environment)
 }
 
 /** Interpolate between two RGB colors across string characters for smooth gradient text */

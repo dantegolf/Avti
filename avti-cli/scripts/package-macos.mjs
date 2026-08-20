@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { ensurePiAiModelManifest } from './repair-pi-ai-runtime.mjs'
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const repoRoot = resolve(packageRoot, '..')
@@ -53,6 +54,10 @@ if (existsSync(join(packagedNodeModules, 'dsh-plugin-desktop'))) {
   throw new Error('Standalone Avti CLI runtime unexpectedly contains dsh-plugin-desktop')
 }
 
+// pi-ai 0.82.x can be installed without its generated hidden catalog manifest.
+// Repair the staged copy before runtime smoke tests so providers/all.js can load.
+ensurePiAiModelManifest(packagedNodeModules)
+
 cpSync(libRoot, join(appRoot, 'lib'), { recursive: true, force: true })
 copyFileSync(join(packageRoot, 'package.json'), join(appRoot, 'package.json'))
 
@@ -91,6 +96,27 @@ const smoke = execFileSync(launcherPath, ['--version'], {
 }).trim()
 if (smoke !== packageJson.version) {
   throw new Error(`packaged Avti CLI reported ${JSON.stringify(smoke)} instead of ${packageJson.version}`)
+}
+
+// --version never boots Harness plugins. Exercise the exact control path that
+// previously failed on macOS when pi-ai's .manifest.json was absent.
+const smokeHome = join(outputRoot, '.smoke-home')
+rmSync(smokeHome, { recursive: true, force: true })
+try {
+  const modelsSmoke = execFileSync(launcherPath, ['models', 'antigravity'], {
+    cwd: outputRoot,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      AVTI_CLI_HOME: smokeHome,
+      AVTI_NO_MOTION: '1',
+    },
+  })
+  if (!modelsSmoke.includes('gemini-3.7-flash-high')) {
+    throw new Error('packaged Avti CLI model smoke did not expose the Antigravity catalog')
+  }
+} finally {
+  rmSync(smokeHome, { recursive: true, force: true })
 }
 
 process.stdout.write(`Standalone Avti CLI macOS ${artifactArch} staged at ${outputRoot}\n`)

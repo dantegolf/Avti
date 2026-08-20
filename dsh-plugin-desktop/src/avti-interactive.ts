@@ -5,7 +5,6 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createInterface, type Interface } from 'node:readline/promises'
-import { pathToFileURL } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
 import {
   installModelSelection,
@@ -32,6 +31,7 @@ import {
   questionWithAvtiSlashPalette,
   type AvtiCommandSuggestion,
 } from './avti-command-palette.ts'
+import { runProfile } from './avti-profile-boot.ts'
 import {
   AVTI_ORBIT_FRAMES,
   AVTI_PULSE_FRAMES,
@@ -48,7 +48,6 @@ import {
   type AvtiSessionControlContext,
 } from './avti-session-controls.ts'
 import { formatAvtiPrompt, loadAvtiTheme, type AvtiThemeRef } from './avti-theme.ts'
-import { runProfile } from './avti-profile-boot.ts'
 import {
   avtiToolPresentation,
   type AvtiToolPresentation,

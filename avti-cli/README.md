@@ -166,6 +166,7 @@ solar-amber     Solar Amber (Warm Cyberpunk Golden CRT phosphor glow)
 cyber-matrix    Cyber Matrix (Phosphor Matrix Green & High-Tech Terminal Jade)
 ice-slate       Ice Slate (Nordic Frost & Arctic Glacial Slate Blue)
 clean-mono      Clean Mono (Minimalist high-contrast monochrome)
+orbit           Avti Orbit (graphite + ice-white + electric cyan)
 claude          Claude Warm (Warm orange accent)
 midnight        Midnight (Cool cyan accent)
 forest          Forest (Muted green accent)
@@ -206,63 +207,8 @@ avti model antigravity gemini-3.7-flash-high
 Or during an interactive session:
 
 ```text
+/models antigravity
 /model antigravity gemini-3.7-flash-high
 ```
 
-The preset currently includes the ClaudeGravity catalog of Gemini and Claude routes, including Gemini 2.5 Pro, Gemini 3.x Flash/Pro variants, Claude Sonnet 4.6 and Claude Opus 4.6 Thinking. `gemini-2.5-pro` advertises the same 2M context window used by ClaudeGravity; the other mirrored routes use the 1M catalog default, with Gemini 3.7 Flash routes exposing the proxy's 65,536-token output capability.
-
-When `antigravity` is the selected provider, `avti doctor` also checks the local proxy health endpoint.
-
-The generated provider overlay is stored under the Avti CLI home and is applied consistently to interactive, resumed, control and one-shot CLI modes. The local proxy key defaults to the conventional `antigravity` value and can be overridden with `ANTIGRAVITY_API_KEY` if the proxy is configured differently.
-
-## Development
-
-From the repository root:
-
-```bash
-yarn build:cli
-yarn typecheck:cli
-yarn check:cli
-```
-
-On Windows x64:
-
-```bash
-yarn dist:cli:win
-```
-
-On a native macOS arm64 or x64 machine:
-
-```bash
-yarn dist:cli:mac
-```
-
-The packaging flow builds the CLI, focuses the Yarn workspace to production dependencies, then copies that dependency tree into the portable runtime. This preserves repository `resolutions` and `patch:` dependencies instead of reinstalling an unpatched runtime through npm.
-
-Portable staging directories are created at:
-
-```text
-avti-cli/dist/avti-windows-x64/
-avti-cli/dist/avti-macos-arm64/
-avti-cli/dist/avti-macos-x64/
-```
-
-Only the directory matching the current native architecture is produced by one macOS packaging run.
-
-## Release versioning
-
-CLI releases use their own package version from `avti-cli/package.json` and tags of the form:
-
-```text
-cli-v0.1.0
-```
-
-Desktop tags remain `vX.Y.Z`. The versions are intentionally independent.
-
-The CLI release workflow builds three artifacts in parallel: Windows x64, macOS arm64 and macOS x64. All three are published into the same `cli-v*` GitHub Release with matching SHA-256 manifests.
-
-## Source layout
-
-The standalone package currently builds the Avti terminal frontend from the shared CLI source that already exists in the repository under `dsh-plugin-desktop/src/avti-*.ts`. This is a **build-time source reuse seam only**: the produced CLI package and portable runtime have no dependency on Avti Desktop or Electron.
-
-A later cleanup may move that shared source into a neutral package without changing the user-facing product boundary.
+The Google/Antigravity sign-in remains owned by ClaudeGravity/`acc`; Avti only needs the local proxy to be running.

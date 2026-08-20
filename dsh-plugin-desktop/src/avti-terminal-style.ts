@@ -20,7 +20,9 @@ import {
   RESET,
   styleAvtiAccent,
   styleAvtiGradient,
+  styleAvtiTone,
   type AvtiTheme,
+  type AvtiTone,
   type RgbColor,
 } from './avti-theme.ts'
 
@@ -79,6 +81,7 @@ export interface AvtiActivityOptions {
   readonly setInterval?: (callback: () => void, milliseconds: number) => ReturnType<typeof setInterval>
   readonly clearInterval?: (handle: ReturnType<typeof setInterval>) => void
   readonly theme?: AvtiTheme
+  readonly announceTurn?: boolean
 }
 
 export interface AvtiActivity {
@@ -123,12 +126,6 @@ export function formatAvtiFailure(label: string): string {
 
 /**
  * 40x26 high-resolution Quantum Singularity Sprite (renders to 13 ANSI rows via ▀/▄ half-blocks)
- * Palette keys:
- *   'C': Electric Cyan #00F5FF
- *   'V': Quantum Violet #A855F7
- *   'B': Deep Space Blue #1D4ED8
- *   'W': Pure Singularity White #FFFFFF
- *   '.': Transparent
  */
 const QUANTUM_CORE_SPRITE: readonly string[] = [
   '........CCCC................CCCC........',
@@ -271,6 +268,21 @@ export function renderAvtiHeader(options: {
   return lines.join('\n')
 }
 
+export function formatAvtiWelcome(
+  theme: AvtiTheme,
+  meta: {
+    project: string
+    provider: string
+    model: string
+    resumed: boolean
+  },
+  output: { readonly isTTY?: boolean } = process.stdout,
+  environment: NodeJS.ProcessEnv = process.env,
+): string {
+  const line = `${meta.project} · ${meta.model}${meta.resumed ? ' · resumed' : ''}`
+  return `${styleAvtiTone(line, 'muted', theme, output, environment)}\n\n`
+}
+
 /**
  * Render the 3-row PromptInputFooter / StatusLine HUD matching dsh-TUI/splash.png & working-line.png
  */
@@ -308,7 +320,6 @@ export function renderAvtiStatusFooter(options: {
   const ctxTotalM = (ctxTotal / 1000000).toFixed(1) + 'M'
   const freeK = ((ctxTotal - ctxUsed) / 1000).toFixed(0) + 'k'
 
-  // Row 1: Segmented Context Pill & readout
   const pillSys = `${bgRgb(59, 130, 246)}${fgRgb(255, 255, 255)} sys ${RESET}`
   const pillPrompt = `${bgRgb(168, 85, 247)}${fgRgb(255, 255, 255)} prompt ${RESET}`
   const pillThink = `${bgRgb(0, 245, 255)}${fgRgb(15, 23, 42)} think ${RESET}`
@@ -317,14 +328,12 @@ export function renderAvtiStatusFooter(options: {
 
   const row1 = `${pillBlock}                         ${DIM}free${RESET}                        ${DIM}ctx ${ctxUsedK}/${ctxTotalM} ${ctxPct}% ${freeK}${RESET}`
 
-  // Row 2: Live Status Line
   const tpsGauge = `|.........| ${theme.accentAnsi}${tps.toFixed(0)} tps${RESET}`
   const inOut = `${(inTok / 1000).toFixed(1)}k→${(outTok / 1000).toFixed(1)}k`
   const leftTelemetry = ` ${theme.accentAnsi}${model}${RESET} · ${effort} · ${tpsGauge} · cache ${cachePct}% · ${inOut}`
   const rightTelemetry = `${theme.secondaryAnsi}${branch}${RESET} · ${cwd} · ${title}`
   const row2 = `${leftTelemetry}              ${rightTelemetry}`
 
-  // Row 3: Mode / Hint Line
   const leftMode = ` ${theme.successAnsi}${statusMsg}${RESET} · ${theme.warningAnsi}🔥 9.1k${RESET}`
   const rightMode = `${DIM}? for shortcuts · /theme${RESET}`
   const row3 = `${leftMode}                                  ${rightMode}`
@@ -372,11 +381,20 @@ export function createAvtiActivity(options: AvtiActivityOptions = {}): AvtiActiv
   const schedule = options.setInterval ?? ((callback, milliseconds) => setInterval(callback, milliseconds))
   const cancel = options.clearInterval ?? (handle => clearInterval(handle))
   const motion = terminalMotionEnabled(output, environment)
+  const theme = options.theme ?? loadAvtiTheme(environment)
+  const announceTurn = options.announceTurn ?? (output.isTTY === true)
 
   let label = ''
   let frameIndex = 0
   let timer: ReturnType<typeof setInterval> | undefined
   let active = false
+  let announced = false
+
+  const ensureAnnounced = (): void => {
+    if (announced || !announceTurn) return
+    announced = true
+    output.write(`${styleAvtiTone('◆ Avti', 'accentBright', theme, output, environment)}\n`)
+  }
 
   const writeFrame = (): void => {
     if (!active) return
@@ -398,6 +416,7 @@ export function createAvtiActivity(options: AvtiActivityOptions = {}): AvtiActiv
   return {
     start(nextLabel: string) {
       if (active) return
+      ensureAnnounced()
       label = nextLabel
       frameIndex = 0
       active = true
@@ -441,15 +460,19 @@ export async function renderAvtiIntro(options: AvtiMotionOptions = {}): Promise<
   const environment = options.environment ?? process.env
   const frameDelayMs = options.frameDelayMs ?? 110
   const sleep = options.sleep ?? defaultSleep
+  const theme = options.theme ?? loadAvtiTheme(environment)
 
   if (output.isTTY !== true || environment.CI !== undefined) return
   if (!terminalMotionEnabled(output, environment)) {
-    output.write('AVTI\n\n')
+    output.write(`${styleAvtiTone('◇ AVTI', 'accentBright', theme, output, environment)}\n\n`)
     return
   }
 
   for (let index = 0; index < AVTI_INTRO_FRAMES.length; index += 1) {
-    output.write(`${ERASE_LINE}${CURSOR_COLUMN_ZERO}${AVTI_INTRO_FRAMES[index]}`)
+    const frame = index + 1 === AVTI_INTRO_FRAMES.length
+      ? `◇ ${AVTI_INTRO_FRAMES[index]}`
+      : AVTI_INTRO_FRAMES[index]!
+    output.write(`${ERASE_LINE}${CURSOR_COLUMN_ZERO}${styleAvtiTone(frame, index + 1 === AVTI_INTRO_FRAMES.length ? 'accentBright' : 'accent', theme, output, environment)}`)
     if (index + 1 < AVTI_INTRO_FRAMES.length) await sleep(frameDelayMs)
   }
   await sleep(160)

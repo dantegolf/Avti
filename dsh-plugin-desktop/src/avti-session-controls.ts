@@ -17,8 +17,10 @@ import {
   RESET,
   resolveAvtiTheme,
   saveAvtiTheme,
-  styleAvtiAccent,
+  styleAvtiSelection,
+  styleAvtiTone,
   type AvtiThemeRef,
+  type AvtiTone,
 } from './avti-theme.ts'
 
 export interface AvtiSessionControlContext {
@@ -31,6 +33,28 @@ export interface AvtiSessionControlContext {
 }
 
 export type AvtiSessionControlResult = 'handled' | 'exit' | 'unhandled'
+
+function styled(context: AvtiSessionControlContext, text: string, tone: AvtiTone): string {
+  return styleAvtiTone(text, tone, context.theme.current)
+}
+
+function sectionTitle(context: AvtiSessionControlContext, title: string): string {
+  return `${styled(context, '╭─', 'subtle')} ${styled(context, title, 'accent')}`
+}
+
+function sectionEnd(context: AvtiSessionControlContext, hint?: string): string {
+  return hint === undefined
+    ? styled(context, '╰─', 'subtle')
+    : `${styled(context, '╰─', 'subtle')} ${styled(context, hint, 'muted')}`
+}
+
+function errorLine(context: AvtiSessionControlContext, message: string): string {
+  return `  ${styled(context, '×', 'error')} ${styled(context, message, 'muted')}`
+}
+
+function successLine(context: AvtiSessionControlContext, message: string): string {
+  return `  ${styled(context, '✓', 'success')} ${styled(context, message, 'text')}`
+}
 
 export function latestAvtiSessionSelection(events: readonly SessionEvent[]): ModelSelection | undefined {
   for (let index = events.length - 1; index >= 0; index -= 1) {
@@ -54,50 +78,55 @@ export function currentAvtiSelection(context: AvtiSessionControlContext): ModelS
 
 async function renderModels(context: AvtiSessionControlContext, providerFilter?: string): Promise<void> {
   const llm = context.ctx.get('llm')
-  const theme = context.theme.current
   if (llm === undefined) {
-    process.stdout.write(`\n  ${theme.errorAnsi}×${RESET} Model registry is unavailable\n\n`)
+    process.stdout.write(`\n${errorLine(context, 'Model registry is unavailable')}\n\n`)
     return
   }
   const selected = currentAvtiSelection(context)
   const providers = llm.listProviders().filter(provider => providerFilter === undefined || provider.id === providerFilter)
   if (providers.length === 0) {
-    process.stdout.write(`\n  ${theme.errorAnsi}×${RESET} Provider not found: ${providerFilter ?? '(none)'}\n\n`)
+    process.stdout.write(`\n${errorLine(context, `Provider not found: ${providerFilter ?? '(none)'}`)}\n\n`)
     return
   }
 
   process.stdout.write('\n')
   for (const provider of providers) {
-    process.stdout.write(`  ${theme.accentAnsi}${BOLD}${provider.name}${RESET} · ${DIM}${provider.id}${RESET}\n`)
+    process.stdout.write(`${sectionTitle(context, `${provider.name} · ${provider.id}`)}\n`)
     try {
       const models = await llm.listModels(provider.id)
       if (models.length === 0) {
-        process.stdout.write('    · No catalog entries (custom model ids may still work)\n')
+        process.stdout.write(`  ${styled(context, '│', 'subtle')} ${styled(context, 'No catalog entries · custom ids may still work', 'muted')}\n`)
+        process.stdout.write(`${sectionEnd(context)}\n`)
         continue
       }
       for (const model of models) {
         const isCurrent = selected.provider === provider.id && selected.model === model.id
-        const mark = isCurrent ? `${theme.accentAnsi}›${RESET}` : ' '
-        const nameStyled = isCurrent ? `${BOLD}${model.name}${RESET}` : model.name
-        process.stdout.write(`    ${mark} ${nameStyled} · ${DIM}${model.id}${RESET}\n`)
+        const label = `${model.name}  ${styled(context, `· ${model.id}`, 'muted')}`
+        if (isCurrent) {
+          process.stdout.write(`  ${styleAvtiSelection(`› ${model.name} · ${model.id}`, context.theme.current)}\n`)
+        } else {
+          process.stdout.write(`  ${styled(context, '│', 'subtle')} ${label}\n`)
+        }
       }
     } catch (error: unknown) {
-      process.stdout.write(`    ${theme.errorAnsi}×${RESET} ${error instanceof Error ? error.message : String(error)}\n`)
+      process.stdout.write(`${errorLine(context, error instanceof Error ? error.message : String(error))}\n`)
     }
+    process.stdout.write(`${sectionEnd(context)}\n`)
   }
   process.stdout.write('\n')
 }
 
 async function switchModel(context: AvtiSessionControlContext, args: readonly string[]): Promise<void> {
   const selected = currentAvtiSelection(context)
-  const theme = context.theme.current
   if (args.length === 0) {
-    process.stdout.write(`\n  ${selected.provider} · ${selected.model}\n  Run /models to browse the registered catalog.\n\n`)
+    process.stdout.write(`\n${sectionTitle(context, 'Model')}\n`)
+    process.stdout.write(`  ${styled(context, '│', 'subtle')} ${styled(context, `${selected.provider}/${selected.model}`, 'text')}\n`)
+    process.stdout.write(`${sectionEnd(context, '/models to browse')}\n\n`)
     return
   }
   const llm = context.ctx.get('llm')
   if (llm === undefined) {
-    process.stdout.write(`\n  ${theme.errorAnsi}×${RESET} Model registry is unavailable\n\n`)
+    process.stdout.write(`\n${errorLine(context, 'Model registry is unavailable')}\n\n`)
     return
   }
 
@@ -108,81 +137,83 @@ async function switchModel(context: AvtiSessionControlContext, args: readonly st
     const next: ModelSelection = { provider: resolved.provider, model: resolved.id }
     await context.saveSelection(next)
     context.selection.current = next
-    process.stdout.write(`\n  ${theme.successAnsi}✓${RESET} Model · ${resolved.name} (${resolved.provider}/${resolved.id})\n\n`)
+    process.stdout.write(`\n${successLine(context, `Model · ${resolved.name}`)}\n  ${styled(context, `${resolved.provider}/${resolved.id}`, 'muted')}\n\n`)
   } catch (error: unknown) {
-    process.stdout.write(`\n  ${theme.errorAnsi}×${RESET} Could not select model: ${error instanceof Error ? error.message : String(error)}\n\n`)
+    process.stdout.write(`\n${errorLine(context, `Could not select model: ${error instanceof Error ? error.message : String(error)}`)}\n\n`)
   }
 }
 
 function switchTheme(context: AvtiSessionControlContext, requested?: string): void {
-  const currentTheme = context.theme.current
   if (requested === undefined || requested.trim() === '') {
-    process.stdout.write('\n  Themes\n')
+    process.stdout.write(`\n${sectionTitle(context, 'Themes')}\n`)
     for (const theme of AVTI_THEMES) {
-      const isCurrent = currentTheme.id === theme.id
-      const mark = isCurrent ? `${currentTheme.accentAnsi}›${RESET}` : ' '
-      const nameStyled = isCurrent ? `${BOLD}${theme.name}${RESET}` : theme.name
-      process.stdout.write(`  ${mark} ${theme.id.padEnd(14)} ${nameStyled} · ${DIM}${theme.description}${RESET}\n`)
+      const active = context.theme.current.id === theme.id
+      const body = `${theme.id.padEnd(14)} ${theme.name} · ${theme.description}`
+      if (active) process.stdout.write(`  ${styleAvtiSelection(`› ${body}`, context.theme.current)}\n`)
+      else process.stdout.write(`  ${styled(context, '│', 'subtle')} ${styled(context, body, 'muted')}\n`)
     }
-    process.stdout.write('\n  Change with: /theme <name>\n\n')
+    process.stdout.write(`${sectionEnd(context, '/theme <name>')}\n\n`)
     return
   }
 
   const candidate = resolveAvtiTheme(requested.trim())
   if (candidate === undefined) {
-    process.stdout.write(`\n  ${currentTheme.errorAnsi}×${RESET} Unknown theme: ${requested}\n  Run /theme to see available themes.\n\n`)
+    process.stdout.write(`\n${errorLine(context, `Unknown theme: ${requested}`)}\n  ${styled(context, '/theme to see available themes', 'muted')}\n\n`)
     return
   }
 
   try {
     context.theme.current = saveAvtiTheme(candidate.id)
-    process.stdout.write(`\n  ${candidate.successAnsi}✓${RESET} Theme · ${candidate.name} (${candidate.id})\n\n`)
+    process.stdout.write(`\n${successLine(context, `Theme · ${candidate.name}`)}\n  ${styled(context, candidate.description, 'muted')}\n\n`)
   } catch (error: unknown) {
-    process.stdout.write(`\n  ${currentTheme.errorAnsi}×${RESET} Could not save theme: ${error instanceof Error ? error.message : String(error)}\n\n`)
+    process.stdout.write(`\n${errorLine(context, `Could not save theme: ${error instanceof Error ? error.message : String(error)}`)}\n\n`)
   }
 }
 
 async function renderSessions(context: AvtiSessionControlContext): Promise<void> {
   const query = context.ctx.get('sessionQuery')
-  const theme = context.theme.current
   if (query === undefined) {
-    process.stdout.write(`\n  ${theme.errorAnsi}×${RESET} Session history is unavailable\n\n`)
+    process.stdout.write(`\n${errorLine(context, 'Session history is unavailable')}\n\n`)
     return
   }
   try {
     const records = (await query.listSessions())
       .filter(record => record.persisted && record.header.cwd === process.cwd())
       .slice(0, 10)
-    process.stdout.write('\n  Recent sessions\n')
-    if (records.length === 0) process.stdout.write('  No saved sessions for this project.\n')
+    process.stdout.write(`\n${sectionTitle(context, 'Recent sessions')}\n`)
+    if (records.length === 0) process.stdout.write(`  ${styled(context, '│', 'subtle')} ${styled(context, 'No saved sessions for this project', 'muted')}\n`)
     for (const record of records) {
-      const mark = record.header.id === context.agent.id ? `${theme.accentAnsi}›${RESET}` : ' '
+      const active = record.header.id === context.agent.id
       const title = await query.readTitle(record.header.id).catch(() => undefined)
       const label = title?.title?.trim() || String(record.header.id)
-      process.stdout.write(`  ${mark} ${label} · ${DIM}${String(record.header.id)}${RESET}\n`)
+      const body = `${label} · ${String(record.header.id)}`
+      if (active) process.stdout.write(`  ${styleAvtiSelection(`› ${body}`, context.theme.current)}\n`)
+      else process.stdout.write(`  ${styled(context, '│', 'subtle')} ${styled(context, body, 'muted')}\n`)
     }
-    process.stdout.write('\n  Resume from the shell with: avti resume <session-id>\n\n')
+    process.stdout.write(`${sectionEnd(context, 'avti resume <session-id>')}\n\n`)
   } catch (error: unknown) {
-    process.stdout.write(`\n  ${theme.errorAnsi}×${RESET} Could not read sessions: ${error instanceof Error ? error.message : String(error)}\n\n`)
+    process.stdout.write(`\n${errorLine(context, `Could not read sessions: ${error instanceof Error ? error.message : String(error)}`)}\n\n`)
   }
 }
 
 function renderHelp(context: AvtiSessionControlContext): void {
-  const theme = context.theme.current
-  process.stdout.write(`\n  ${theme.accentAnsi}${BOLD}Avti Commands${RESET}\n`)
+  process.stdout.write(`\n${sectionTitle(context, 'Avti commands')}\n`)
   for (const command of AVTI_COMMAND_SUGGESTIONS) {
-    const input = command.hint === undefined ? '' : ` ${DIM}${command.hint}${RESET}`
-    const category = command.category ? ` ${theme.secondaryAnsi}[${command.category}]${RESET}` : ''
-    process.stdout.write(`  ${BOLD}${command.command}${RESET}${input} ${category} · ${command.description}\n`)
+    const input = command.hint === undefined ? '' : ` ${command.hint}`
+    const commandText = `${command.command}${input}`.padEnd(28)
+    process.stdout.write(`  ${styled(context, '│', 'subtle')} ${styled(context, commandText, 'text')} ${styled(context, command.description, 'muted')}\n`)
   }
+  process.stdout.write(`${sectionEnd(context)}\n`)
 
   const native = context.ctx.get('commands')?.list(context.agent) ?? []
   if (native.length > 0) {
-    process.stdout.write(`\n  ${theme.secondaryAnsi}${BOLD}Harness Commands${RESET}\n`)
+    process.stdout.write(`${sectionTitle(context, 'Plugin commands')}\n`)
     for (const command of native) {
-      const input = command.input?.hint === undefined ? '' : ` ${DIM}${command.input.hint}${RESET}`
-      process.stdout.write(`  /${command.name}${input} · ${command.description}\n`)
+      const input = command.input?.hint === undefined ? '' : ` ${command.input.hint}`
+      const commandText = `/${command.name}${input}`.padEnd(28)
+      process.stdout.write(`  ${styled(context, '│', 'subtle')} ${styled(context, commandText, 'text')} ${styled(context, command.description, 'muted')}\n`)
     }
+    process.stdout.write(`${sectionEnd(context)}\n`)
   }
   process.stdout.write('\n')
 }
@@ -199,12 +230,12 @@ async function executeNativeCommand(
     if (execution === undefined) return 'unknown'
     const text = execution.result.text
     if (text !== undefined && text !== '') {
-      const prefix = execution.result.kind === 'error' ? `  ${context.theme.current.errorAnsi}×${RESET} ` : '  '
-      process.stdout.write(`\n${prefix}${text}\n\n`)
+      const rendered = execution.result.kind === 'error' ? errorLine(context, text) : text
+      process.stdout.write(`\n${rendered}\n\n`)
     }
     return 'handled'
   } catch (error: unknown) {
-    process.stdout.write(`\n  ${context.theme.current.errorAnsi}×${RESET} ${error instanceof Error ? error.message : String(error)}\n\n`)
+    process.stdout.write(`\n${errorLine(context, error instanceof Error ? error.message : String(error))}\n\n`)
     return 'handled'
   }
 }
@@ -217,7 +248,6 @@ export async function handleAvtiSessionControl(
   const trimmed = input.trim()
   if (!trimmed.startsWith('/')) return 'unhandled'
   const [command = '', ...args] = trimmed.split(/\s+/u)
-  const theme = context.theme.current
 
   switch (command.toLowerCase()) {
     case '/exit':
@@ -228,26 +258,23 @@ export async function handleAvtiSessionControl(
       return 'handled'
     case '/status': {
       const selected = currentAvtiSelection(context)
-      const border = theme.borderAnsi || DIM
-      process.stdout.write([
-        '',
-        `  ${border}┌───${RESET} ${theme.accentAnsi}${BOLD}Avti Telemetry Deck${RESET} ${border}───────────────────────────────────────────┐${RESET}`,
-        `  ${border}│${RESET}  ${DIM}Project${RESET}    ${BOLD}${process.cwd()}${RESET}`,
-        `  ${border}│${RESET}  ${DIM}Provider${RESET}   ${theme.secondaryAnsi}${selected.provider}${RESET}`,
-        `  ${border}│${RESET}  ${DIM}Model${RESET}      ${theme.accentAnsi}${selected.model}${RESET}`,
-        ...(selected.reasoningEffort === undefined ? [] : [`  ${border}│${RESET}  ${DIM}Reasoning${RESET}  ${String(selected.reasoningEffort)}`]),
-        `  ${border}│${RESET}  ${DIM}Theme${RESET}      ${theme.name} (${theme.id})`,
-        `  ${border}│${RESET}  ${DIM}Context${RESET}    ${renderAvtiProgressBar(14200, 200000, 16, theme)} ${DIM}7.1% (14.2k/200k)${RESET}`,
-        `  ${border}│${RESET}  ${DIM}Session${RESET}    ${DIM}${String(context.agent.id)}${RESET}`,
-        `  ${border}│${RESET}  ${DIM}Permission${RESET} ${theme.successAnsi}${process.env.DSH_PERMISSION_MODE ?? 'workspace-write'}${RESET}`,
-        `  ${border}└───${RESET} ${theme.successAnsi}⚡ High-Throughput Bridge Connected${RESET} ${border}───────────────────────────┘${RESET}`,
-        '',
-      ].join('\n'))
+      process.stdout.write(`\n${sectionTitle(context, 'Status')}\n`)
+      process.stdout.write(`  ${styled(context, '│', 'subtle')} ${styled(context, 'Project    ', 'muted')}${styled(context, process.cwd(), 'text')}\n`)
+      process.stdout.write(`  ${styled(context, '│', 'subtle')} ${styled(context, 'Provider   ', 'muted')}${styled(context, selected.provider, 'text')}\n`)
+      process.stdout.write(`  ${styled(context, '│', 'subtle')} ${styled(context, 'Model      ', 'muted')}${styled(context, selected.model, 'text')}\n`)
+      if (selected.reasoningEffort !== undefined) {
+        process.stdout.write(`  ${styled(context, '│', 'subtle')} ${styled(context, 'Reasoning  ', 'muted')}${styled(context, String(selected.reasoningEffort), 'text')}\n`)
+      }
+      process.stdout.write(`  ${styled(context, '│', 'subtle')} ${styled(context, 'Theme      ', 'muted')}${styled(context, `${context.theme.current.name} (${context.theme.current.id})`, 'text')}\n`)
+      process.stdout.write(`  ${styled(context, '│', 'subtle')} ${styled(context, 'Context    ', 'muted')}${renderAvtiProgressBar(14200, 200000, 16, context.theme.current)} ${styled(context, '7.1% (14.2k/200k)', 'muted')}\n`)
+      process.stdout.write(`  ${styled(context, '│', 'subtle')} ${styled(context, 'Session    ', 'muted')}${styled(context, String(context.agent.id), 'muted')}\n`)
+      process.stdout.write(`  ${styled(context, '│', 'subtle')} ${styled(context, 'Permission ', 'muted')}${styled(context, process.env.DSH_PERMISSION_MODE ?? 'workspace-write', 'text')}\n`)
+      process.stdout.write(`${sectionEnd(context)}\n\n`)
       return 'handled'
     }
     case '/presentation':
     case '/demo':
-      await runAvtiPresentation({ theme })
+      await runAvtiPresentation({ theme: context.theme.current })
       return 'handled'
     case '/models':
       await renderModels(context, args[0])
@@ -264,7 +291,7 @@ export async function handleAvtiSessionControl(
     default: {
       const native = await executeNativeCommand(trimmed, context)
       if (native === 'handled') return 'handled'
-      process.stdout.write(`\n  ${theme.errorAnsi}×${RESET} Unknown command: ${command}\n  Run /help to see available commands.\n\n`)
+      process.stdout.write(`\n${errorLine(context, `Unknown command: ${command}`)}\n  ${styled(context, '/help to see available commands', 'muted')}\n\n`)
       return 'handled'
     }
   }

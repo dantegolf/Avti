@@ -28,8 +28,10 @@ describe('Avti CLI presentation', () => {
     expect(AVTI_ORBIT_FRAMES).toEqual(['◜', '◝', '◞', '◟'])
     expect(AVTI_PULSE_FRAMES).toHaveLength(8)
     expect(formatAvtiActivity('◜', 'Reading project')).toBe('  ◜ Reading project')
-    expect(formatAvtiSuccess('Done')).toBe('  ✓ Done')
-    expect(formatAvtiFailure('Command failed')).toBe('  × Command failed')
+    expect(formatAvtiSuccess('Done')).toContain('✓')
+    expect(formatAvtiSuccess('Done')).toContain('Done')
+    expect(formatAvtiFailure('Command failed')).toContain('×')
+    expect(formatAvtiFailure('Command failed')).toContain('Command failed')
   })
 
   it('disables cursor motion outside an interactive terminal', () => {
@@ -55,7 +57,7 @@ describe('Avti CLI presentation', () => {
     expect(output).toBe('')
   })
 
-  it('renders a static wordmark when motion is disabled in a real terminal', async () => {
+  it('renders a static Avti mark when motion is disabled in a real terminal', async () => {
     let output = ''
     await renderAvtiIntro({
       output: {
@@ -65,9 +67,9 @@ describe('Avti CLI presentation', () => {
           return true
         },
       },
-      environment: { AVTI_NO_MOTION: '1' },
+      environment: { AVTI_NO_MOTION: '1', NO_COLOR: '1' },
     })
-    expect(output).toBe('AVTI\n\n')
+    expect(output).toBe('◇ AVTI\n\n')
   })
 
   it('animates only the short startup reveal on a TTY', async () => {
@@ -81,12 +83,12 @@ describe('Avti CLI presentation', () => {
           return true
         },
       },
-      environment: {},
+      environment: { NO_COLOR: '1' },
       sleep,
     })
 
     expect(output).toContain('A')
-    expect(output).toContain('AVTI')
+    expect(output).toContain('◇ AVTI')
     expect(output.endsWith('\n\n')).toBe(true)
     expect(sleep).toHaveBeenCalledTimes(4)
   })
@@ -103,7 +105,7 @@ describe('Avti CLI presentation', () => {
           return true
         },
       },
-      environment: {},
+      environment: { NO_COLOR: '1' },
       setInterval(callback) {
         tick = callback
         return 1 as unknown as ReturnType<typeof setInterval>
@@ -133,7 +135,7 @@ describe('Avti CLI presentation', () => {
           return true
         },
       },
-      environment: {},
+      environment: { NO_COLOR: '1' },
     })
 
     activity.start('Reading project')
@@ -145,6 +147,7 @@ describe('Avti CLI presentation', () => {
   it('offers persistent terminal themes including signature aurora and classic options', () => {
     expect(AVTI_THEMES.map(theme => theme.id)).toContain('aurora')
     expect(AVTI_THEMES.map(theme => theme.id)).toContain('antigravity')
+    expect(AVTI_THEMES.map(theme => theme.id)).toContain('orbit')
     expect(AVTI_THEMES.map(theme => theme.id)).toContain('claude')
     expect(resolveAvtiTheme('CLAUDE')?.name).toBe('Claude Warm')
     expect(resolveAvtiTheme('AURORA')?.name).toBe('Avti Aurora')
