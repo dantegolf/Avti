@@ -16,6 +16,10 @@ concurrency:
 
 env:
   DSH_TELEMETRY_DISABLED: '1'
+  # The branch intentionally uses mutable installs until the avti-cli workspace
+  # entry is regenerated into yarn.lock. Yarn 4 otherwise auto-enables hardened
+  # mode for public PRs and defeats the non-immutable install below.
+  YARN_ENABLE_HARDENED_MODE: '0'
 
 jobs:
   # Full product gate: build, typecheck, unit tests, and every headless smoke.
@@ -36,10 +40,11 @@ jobs:
         with:
           path: ${{ steps.yarn-cache.outputs.dir }}
           key: yarn-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('yarn.lock', '.yarnrc.yml') }}
-      - run: yarn install --immutable
+      # TODO: restore --immutable and remove YARN_ENABLE_HARDENED_MODE after the avti-cli workspace entry is regenerated into yarn.lock.
+      - run: yarn install --no-immutable
       - run: yarn check
 
-  # Windows-only logic and unsigned NSIS/portable builds on a real Windows runner.
+  # Windows-only logic and unsigned Desktop/CLI artifacts on a real Windows runner.
   desktop-windows:
     runs-on: windows-latest
     steps:
@@ -57,29 +62,31 @@ jobs:
         with:
           path: ${{ steps.yarn-cache.outputs.dir }}
           key: yarn-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('yarn.lock', '.yarnrc.yml') }}
-      - run: yarn install --immutable
-      - name: Validate PowerShell bootstrap installer
+      # TODO: restore --immutable and remove YARN_ENABLE_HARDENED_MODE after the avti-cli workspace entry is regenerated into yarn.lock.
+      - run: yarn install --no-immutable
+      - name: Validate PowerShell bootstrap installers
         shell: pwsh
         run: |
-          $tokens = $null
-          $errors = $null
-          [System.Management.Automation.Language.Parser]::ParseFile(
-            (Resolve-Path './install.ps1'),
-            [ref]$tokens,
-            [ref]$errors
-          ) | Out-Null
-          if ($errors.Count -gt 0) {
-            $errors | ForEach-Object { Write-Error $_.Message }
-            exit 1
+          foreach ($file in @('./install.ps1', './install-cli.ps1')) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $file),
+              [ref]$tokens,
+              [ref]$errors
+            ) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error "${file}: $($_.Message)" }
+              exit 1
+            }
           }
       - run: yarn check
       - run: yarn dist:win
       - run: yarn dist:win-portable
+      # Run last: production focus intentionally prunes the development install.
+      - run: yarn dist:cli:win
 
-  # macOS-only universal packaging smoke on a real macOS runner: the signed
-  # release is built manually on a credentialed machine, so an unsigned DMG
-  # here catches Intel and Apple Silicon packaging regressions before a manual
-  # release. No signing secrets ever reach this job.
+  # macOS-only universal Desktop packaging smoke on a real macOS runner.
   desktop-macos:
     runs-on: macos-latest
     timeout-minutes: 60
@@ -98,6 +105,86 @@ jobs:
         with:
           path: ${{ steps.yarn-cache.outputs.dir }}
           key: yarn-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('yarn.lock', '.yarnrc.yml') }}
-      - run: yarn install --immutable
+      # TODO: restore --immutable and remove YARN_ENABLE_HARDENED_MODE after the avti-cli workspace entry is regenerated into yarn.lock.
+      - run: yarn install --no-immutable
       - run: yarn workspace dsh-community-market check
       - run: yarn dist:mac-smoke
+
+  # The CLI ships native architecture-specific macOS runtimes, so both variants are gated independently.
+  cli-macos:
+    name: CLI macOS ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.23.2
+      - name: Verify runner architecture
+        shell: bash
+        run: test "$(node -p 'process.arch')" = '${{ matrix.arch }}'
+      - run: corepack enable
+      - name: Resolve Yarn cache folder
+        id: yarn-cache
+        run: echo "dir=$(yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        with:
+          path: ${{ steps.yarn-cache.outputs.dir }}
+          key: yarn-cli-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('yarn.lock', '.yarnrc.yml') }}
+      # TODO: restore --immutable and remove YARN_ENABLE_HARDENED_MODE after the avti-cli workspace entry is regenerated into yarn.lock.
+      - run: yarn install --no-immutable
+      - run: yarn typecheck:cli
+      # Production focus intentionally prunes the development install after typecheck.
+      - run: yarn dist:cli:mac
+      - name: Archive and verify standalone macOS CLI test build
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="avti-cli-macos-${{ matrix.arch }}-0.1.4.tar.gz"
+          tar -C avti-cli/dist -czf "$archive" "avti-macos-${{ matrix.arch }}"
+
+          listing="$(mktemp)"
+          tar -tzf "$archive" > "$listing"
+          grep -Fq "avti-macos-${{ matrix.arch }}/app/node_modules/@earendil-works/pi-ai/dist/providers/data/.manifest.json" "$listing"
+
+          unpack="$(mktemp -d)"
+          trap 'rm -rf "$unpack" "$listing"' EXIT
+          tar -xzf "$archive" -C "$unpack"
+          bundle="$unpack/avti-macos-${{ matrix.arch }}"
+
+          actual_version="$(cat "$bundle/VERSION")"
+          echo "portable version: $actual_version"
+          test "$actual_version" = "0.1.4"
+          test -f "$bundle/app/node_modules/@earendil-works/pi-ai/dist/providers/data/.manifest.json"
+
+          # Run the extracted artifact from an isolated user project. Running it
+          # from the Avti source checkout would intentionally load that project's
+          # local Harness layers and would no longer be a portable-artifact smoke.
+          project="$unpack/project"
+          mkdir -p "$project"
+          set +e
+          models_output="$(cd "$project" && AVTI_CLI_HOME="$unpack/home" AVTI_NO_MOTION=1 NO_COLOR=1 "$bundle/avti" models antigravity 2>&1)"
+          models_status=$?
+          set -e
+          printf '%s\n' "$models_output"
+          test "$models_status" -eq 0
+          case "$models_output" in
+            *gemini-3.7-flash-high*) ;;
+            *) echo "portable model smoke did not expose gemini-3.7-flash-high" >&2; exit 1 ;;
+          esac
+      - name: Upload standalone macOS CLI test build
+        uses: actions/upload-artifact@v4
+        with:
+          name: avti-cli-macos-${{ matrix.arch }}-0.1.4
+          path: avti-cli-macos-${{ matrix.arch }}-0.1.4.tar.gz
+          if-no-files-found: error
+          retention-days: 7

@@ -5,69 +5,265 @@
 <h1 align="center">Avti</h1>
 
 <p align="center">
-  Локальное AI-пространство для работы с проектами.
+  AI-инструменты для работы с локальными проектами.
 </p>
 
 <p align="center">
-  <a href="https://github.com/dantegolf/Avti/releases/latest"><strong>Скачать для Windows</strong></a>
-  ·
-  <a href="#установка-из-powershell">Установить из PowerShell</a>
+  <strong>Avti Desktop</strong> · визуальный workflow
+  &nbsp;&nbsp;|&nbsp;&nbsp;
+  <strong>Avti CLI</strong> · terminal workflow
 </p>
 
 <p align="center"><strong>Русский</strong> · <a href="README.en.md">English</a> · <a href="README.zh.md">中文</a></p>
 
-<p align="center"><code>ai-agent</code> · <code>desktop</code> · <code>local-projects</code> · <code>electron</code> · <code>plugins</code> · <code>windows</code></p>
+<p align="center"><code>ai-agent</code> · <code>desktop</code> · <code>cli</code> · <code>local-projects</code> · <code>electron</code> · <code>plugins</code> · <code>windows</code> · <code>macos</code></p>
+
+## Два самостоятельных продукта
+
+Avti Desktop и Avti CLI развиваются под одним брендом и могут переиспользовать runtime-код, но не требуют друг друга для установки или работы.
+
+- **Avti Desktop** устанавливается как отдельное desktop-приложение.
+- **Avti CLI** устанавливается как отдельный terminal-продукт.
+- У каждого продукта свой release artifact и своя версия.
+- CLI по умолчанию хранит собственные settings, profiles, credentials, plugins и sessions в `~/.avti/cli`.
+- Удаление или перенастройка одного продукта не должно ломать второй.
 
 ## Быстрый старт
 
-1. Установите и откройте Avti.
-2. Выберите папку локального проекта.
-3. Подключите AI-провайдера и выберите модель.
-4. Создайте новую сессию и начинайте работать.
+### Avti Desktop
 
-Пользователю Avti не нужны Node.js, Yarn или ручная сборка проекта — они требуются только разработчикам.
+1. Скачайте installer из [Releases](https://github.com/dantegolf/Avti/releases).
+2. Установите и откройте Avti Desktop.
+3. Выберите папку локального проекта.
+4. Подключите AI-провайдера и выберите модель.
+5. Создайте новую сессию и начинайте работать.
 
-## Установка на Windows
-
-### Обычная установка
-
-Скачайте последний `Avti-*-x64-Setup.exe` на странице [Releases](https://github.com/dantegolf/Avti/releases/latest) и запустите его.
-
-Установщик создаёт ярлык Avti и устанавливает приложение для текущего пользователя. Windows-сборки проекта сейчас не подписаны Authenticode, поэтому до подключения code signing SmartScreen может показать предупреждение.
-
-### Установка из PowerShell
-
-Для установки последнего релиза одной командой:
+Windows Desktop из PowerShell:
 
 ```powershell
 irm https://raw.githubusercontent.com/dantegolf/Avti/main/install.ps1 | iex
 ```
 
-Терминальный установщик:
+### Avti CLI
 
-- определяет Windows x64;
-- получает последний GitHub Release;
-- скачивает готовый Avti Setup;
-- проверяет опубликованный SHA-256;
-- устанавливает Avti в тихом режиме;
-- запускает приложение, если оно найдено в стандартной папке установки.
+CLI устанавливается отдельно от Desktop. На Windows:
 
-Для диагностики можно скачать `install.ps1` и запустить его с `-Verbose`. Чтобы увидеть обычный интерфейс NSIS-установщика, используйте `-Interactive`.
+```powershell
+irm https://raw.githubusercontent.com/dantegolf/Avti/main/install-cli.ps1 | iex
+```
+
+Установщик Windows выбирает только releases с тегами `cli-v*`, проверяет SHA-256, устанавливает portable runtime в `%LOCALAPPDATA%\Avti\CLI` и добавляет эту папку в пользовательский PATH.
+
+На macOS:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dantegolf/Avti/main/install-cli.sh | sh
+```
+
+macOS installer сам определяет Apple Silicon (`arm64`) или Intel (`x64`), выбирает подходящий `cli-v*` artifact, проверяет SHA-256 и устанавливает CLI в `~/.local/share/avti-cli` с командой `~/.local/bin/avti`.
+
+Откройте новый терминал в папке проекта и запустите:
+
+```bash
+avti
+```
+
+Без аргументов Avti CLI открывает интерактивную терминальную сессию и использует текущую папку как workspace.
+
+```text
+AVTI
+
+C:\Projects\my-app · model-name
+
+› проверь проект и исправь падающие тесты
+
+  ◜ Thinking
+  ∙···· Reading files
+  ✓ Read files
+  ·∙··· Running command
+  ✓ Ran command
+
+Исправил проблему в тестах и проверил результат.
+
+› _
+```
+
+Для одной задачи без интерактивной сессии:
+
+```bash
+avti "объясни архитектуру этого проекта"
+```
+
+Команды CLI:
+
+```bash
+avti status
+avti models
+avti models <provider>
+avti model
+avti model <model>
+avti model <provider> <model>
+avti sessions
+avti resume <session-id>
+avti doctor
+```
+
+`avti model` читает и сохраняет **CLI default model** в отдельном CLI state. Desktop model settings при этом не изменяются.
+
+`avti sessions` показывает последние сохранённые CLI-сессии для текущей папки проекта. Продолжить одну из них можно через `avti resume <session-id>`. Перед восстановлением Avti проверяет, что сохранённая сессия принадлежит текущей папке проекта, а затем использует штатный Harness session resume.
+
+`avti doctor` без model call проверяет workspace, agent runtime, persistence, session history, выбранного provider и разрешение выбранной model.
+
+Полезные команды внутри интерактивной сессии:
+
+```text
+/help                    показать команды терминала
+/status                  показать project, model и session
+/models [provider]       показать доступные модели
+/model                   показать текущую модель
+/model <model>           сменить модель на текущем provider
+/model <provider> <id>   сменить provider и модель
+/sessions                показать CLI-сессии текущего проекта
+/exit                    выйти из Avti
+/quit                    выйти из Avti
+```
+
+Другие зарегистрированные slash-команды Harness, например command plugins, Avti CLI передаёт в нативный Harness command registry вместо собственной повторной реализации.
+
+### CLI state
+
+По умолчанию CLI использует:
+
+```text
+~/.avti/cli
+```
+
+Можно явно переопределить путь:
+
+```powershell
+$env:AVTI_CLI_HOME = 'D:\AvtiCli'
+avti
+```
+
+или на macOS/Linux shell:
+
+```bash
+export AVTI_CLI_HOME="$HOME/.avti/cli-custom"
+avti
+```
+
+`DSH_HOME` остаётся доступным как advanced Harness override.
+
+## Установка и portable artifacts
+
+### Windows Desktop
+
+Desktop release использует tag вида `v2.0.1` и artifact:
+
+```text
+Avti-2.0.1-x64-Setup.exe
+SHA256SUMS.txt
+```
+
+Desktop bootstrap:
+
+```powershell
+irm https://raw.githubusercontent.com/dantegolf/Avti/main/install.ps1 | iex
+```
+
+### Avti CLI — Windows x64
+
+CLI release использует независимый tag вида `cli-v0.1.0` и artifacts:
+
+```text
+avti-windows-x64.zip
+avti-windows-x64.sha256
+```
+
+ZIP содержит собственный Node runtime и production dependencies. На пользовательской машине не нужны Avti Desktop, Node.js или Yarn.
+
+CLI bootstrap:
+
+```powershell
+irm https://raw.githubusercontent.com/dantegolf/Avti/main/install-cli.ps1 | iex
+```
+
+### Avti CLI — macOS
+
+Быстрая установка для Apple Silicon и Intel одной командой:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dantegolf/Avti/main/install-cli.sh | sh
+```
+
+Installer определяет архитектуру через `uname -m`, скачивает соответствующий release artifact, проверяет опубликованный SHA-256 и создаёт команду `~/.local/bin/avti`. Если `~/.local/bin` ещё не находится в `PATH`, installer напечатает готовую строку для добавления в shell config.
+
+#### Apple Silicon
+
+Для M1/M2/M3/M4 и более новых Apple Silicon Mac:
+
+```text
+avti-macos-arm64.tar.gz
+avti-macos-arm64.sha256
+```
+
+Ручная установка:
+
+```bash
+tar -xzf avti-macos-arm64.tar.gz
+cd avti-macos-arm64
+./avti
+```
+
+#### Intel
+
+Для Intel Mac:
+
+```text
+avti-macos-x64.tar.gz
+avti-macos-x64.sha256
+```
+
+Ручная установка:
+
+```bash
+tar -xzf avti-macos-x64.tar.gz
+cd avti-macos-x64
+./avti
+```
+
+macOS CLI artifacts собираются нативно под каждую архитектуру, чтобы Node runtime и native npm dependencies соответствовали машине пользователя.
+
+Windows CLI пока не подписан Authenticode. macOS CLI пока не подписан и не notarized; signing/notarization будет подключаться отдельно от Desktop release signing.
 
 ## Что умеет Avti
 
-- **Работа с локальными проектами** — workspaces, выбор папок, drag-and-drop и нативный directory picker на Windows.
-- **AI-агент и проектный контекст** — сессии, attachments, commands, tools, code runtime, permissions и sandbox-возможности.
-- **Подключаемые модели** — конфигурация AI-провайдеров и моделей через интерфейс приложения.
-- **Десктопный интерфейс** — sidebar, conversation и details surface в нативном окне с системным tray.
-- **Локальный терминал** — интегрированные terminal/shell-сервисы для работы рядом с агентом.
-- **Profiles** — отдельные конфигурации окружения, плагинов и runtime.
-- **Plugin Market** — встроенный каталог community-плагинов с установкой, удалением и управлением.
-- **Диагностика** — локальные логи, boot health, crash evidence, экспорт диагностики и recovery-потоки.
+### Desktop
+
+- работа с локальными проектами и workspaces;
+- desktop conversation UI;
+- project context, attachments и tools;
+- подключаемые providers/models;
+- локальный terminal;
+- profiles и Plugin Market;
+- diagnostics и recovery flows.
+
+### CLI
+
+- интерактивный `avti` в текущей папке проекта;
+- one-shot задачи;
+- streaming model output;
+- tool activity и tool results;
+- approvals и вопросы пользователю;
+- native Harness slash commands;
+- CLI-only model settings;
+- persisted CLI sessions и resume;
+- `status`, `models`, `model`, `sessions`, `doctor`;
+- отдельные portable runtimes для Windows x64, macOS arm64 и macOS x64.
 
 ## Для разработчиков
 
-Требования:
+Требования для разработки репозитория:
 
 - Node.js `^22.19.0` или `>=24.0.0`
 - Yarn `4.18.0`
@@ -77,37 +273,84 @@ git clone https://github.com/dantegolf/Avti.git
 cd Avti
 corepack enable
 yarn install
-yarn dev
 ```
 
-Основные команды:
+Общие проверки:
 
 ```bash
 yarn build
 yarn typecheck
 yarn test
 yarn check
+```
+
+Desktop:
+
+```bash
+yarn dev
 yarn dist:win
 yarn dist:win-portable
 yarn dist:mac
 ```
 
-Windows release pipeline находится в `.github/workflows/release-windows.yml`: tag вида `v2.0.1`, совпадающий с версией desktop package, собирает NSIS installer, создаёт `SHA256SUMS.txt` и публикует оба файла в GitHub Release.
+CLI:
+
+```bash
+yarn build:cli
+yarn typecheck:cli
+yarn check:cli
+yarn dist:cli:win
+yarn dist:cli:mac
+```
+
+`dist:cli:mac` создаёт artifact только для архитектуры текущей macOS-машины. Release CI отдельно запускает его на arm64 и Intel runners.
+
+## Releases
+
+Desktop и CLI публикуются независимо.
+
+### Desktop release
+
+Workflow: `.github/workflows/release-windows.yml`
+
+```text
+version: dsh-plugin-desktop/package.json
+ tag:    v2.0.1
+```
+
+### CLI release
+
+Workflow: `.github/workflows/release-cli-windows.yml`
+
+```text
+version: avti-cli/package.json
+ tag:    cli-v0.1.0
+```
+
+Один `cli-v*` release содержит Windows x64, macOS arm64 и macOS x64 artifacts с отдельными SHA-256 manifests. Версии Desktop и CLI не обязаны совпадать.
 
 ## Структура репозитория
 
-- `dsh-plugin-desktop/` — Electron-оболочка Avti и desktop-сервисы
+- `avti-cli/` — standalone CLI package, cross-platform packaging и CLI release boundary
+- `dsh-plugin-desktop/` — Electron-оболочка Avti Desktop и desktop-сервисы
 - `dsh-community-market/` — каталог плагинов, marketplace UI и install/uninstall flow
 - `dsh-community-fabric/` — совместимость плагинов и contracts
 - `patches/` — compatibility-патчи для зафиксированных runtime-зависимостей
-- `install.ps1` — пользовательский Windows bootstrap installer
+- `install.ps1` — bootstrap installer для Desktop
+- `install-cli.ps1` — независимый Windows bootstrap installer для CLI
+- `install-cli.sh` — независимый macOS bootstrap installer для CLI
+
+На текущем этапе CLI package переиспользует часть terminal frontend source из `dsh-plugin-desktop/src/avti-*.ts` **только во время сборки**. Готовый CLI artifact не зависит от Desktop или Electron. Следующий внутренний cleanup — вынести этот source seam в нейтральный shared package, не меняя пользовательскую границу продуктов.
 
 ## Open source и лицензии
 
-Avti использует runtime-пакеты DeepSeek Harness и другие open-source компоненты. Эти зависимости остаются явно указаны в лицензиях и third-party notices; пользовательский установочный процесс просто не требует вручную работать с их пакетными менеджерами и build-командами.
+Avti использует runtime-пакеты DeepSeek Harness и другие open-source компоненты. Эти зависимости остаются явно указаны в package metadata и распространяются с собственными license files в production dependency tree.
 
-Лицензия проекта: [`LICENSE`](LICENSE). Сторонние компоненты desktop-пакета: [`dsh-plugin-desktop/THIRD_PARTY_NOTICES.md`](dsh-plugin-desktop/THIRD_PARTY_NOTICES.md).
+Лицензия проекта: [`LICENSE`](LICENSE). Сторонние компоненты Desktop: [`dsh-plugin-desktop/THIRD_PARTY_NOTICES.md`](dsh-plugin-desktop/THIRD_PARTY_NOTICES.md). Сторонние компоненты CLI: [`avti-cli/THIRD_PARTY_NOTICES.md`](avti-cli/THIRD_PARTY_NOTICES.md).
 
 ## Текущие ограничения
 
-Avti пока не имеет собственного подписанного automatic-update канала. Updater исходного DSH Desktop отключён, а Windows installer пока публикуется без Authenticode-подписи. Следующий production-шаг для Windows — добавить code signing в release pipeline.
+- Desktop и CLI пока публикуются без production code signing.
+- macOS CLI пока не notarized.
+- CLI source seam ещё физически находится рядом с Desktop source и должен быть вынесен в нейтральный package после стабилизации build boundary.
+- Automatic update для Desktop и CLI не включён.

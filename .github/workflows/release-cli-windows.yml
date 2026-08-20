@@ -1,0 +1,242 @@
+name: Release Avti CLI
+
+on:
+  push:
+    tags:
+      - 'cli-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'CLI release tag, for example cli-v0.1.0'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  metadata:
+    name: Resolve CLI release metadata
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Resolve version and tag
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./avti-cli/package.json').version")
+          if [[ '${{ github.event_name }}' == 'workflow_dispatch' ]]; then
+            tag='${{ inputs.tag }}'
+          else
+            tag='${{ github.ref_name }}'
+          fi
+          expected="cli-v${version}"
+          if [[ "$tag" != "$expected" ]]; then
+            echo "CLI release tag $tag does not match avti-cli version $version (expected $expected)" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  windows-cli:
+    name: Build Windows x64 CLI
+    needs: metadata
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Enable Yarn
+        shell: pwsh
+        run: |
+          corepack enable
+          corepack prepare yarn@4.18.0 --activate
+      - name: Install dependencies
+        shell: pwsh
+        run: yarn install
+      - name: Typecheck standalone CLI
+        shell: pwsh
+        run: yarn typecheck:cli
+      - name: Build standalone Windows CLI
+        shell: pwsh
+        run: yarn dist:cli:win
+      - name: Create ZIP and checksum
+        shell: pwsh
+        run: |
+          $source = Resolve-Path 'avti-cli/dist/avti-windows-x64'
+          $zip = Join-Path (Split-Path $source -Parent) 'avti-windows-x64.zip'
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path (Join-Path $source '*') -DestinationPath $zip -CompressionLevel Optimal
+          $hash = (Get-FileHash -Path $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $(Split-Path $zip -Leaf)" | Set-Content -Path 'avti-cli/dist/avti-windows-x64.sha256' -Encoding ascii
+      - name: Smoke-test extracted Windows CLI
+        shell: pwsh
+        run: |
+          $smoke = Join-Path $env:RUNNER_TEMP 'avti-cli-windows-smoke'
+          if (Test-Path $smoke) { Remove-Item $smoke -Recurse -Force }
+          Expand-Archive -Path 'avti-cli/dist/avti-windows-x64.zip' -DestinationPath $smoke
+          $reported = & (Join-Path $smoke 'avti.cmd') --version
+          if ($reported.Trim() -ne '${{ needs.metadata.outputs.version }}') {
+            throw "Portable CLI reported $reported instead of ${{ needs.metadata.outputs.version }}"
+          }
+      - name: Upload Windows release files
+        uses: actions/upload-artifact@v4
+        with:
+          name: avti-cli-windows-x64
+          path: |
+            avti-cli/dist/avti-windows-x64.zip
+            avti-cli/dist/avti-windows-x64.sha256
+          if-no-files-found: error
+
+  macos-cli:
+    name: Build macOS ${{ matrix.arch }} CLI
+    needs: metadata
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Verify native runner architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual=$(node -p 'process.arch')
+          if [[ "$actual" != '${{ matrix.arch }}' ]]; then
+            echo "Expected ${{ matrix.arch }} Node, got $actual" >&2
+            exit 1
+          fi
+      - name: Enable Yarn
+        shell: bash
+        run: |
+          corepack enable
+          corepack prepare yarn@4.18.0 --activate
+      - name: Install dependencies
+        shell: bash
+        run: yarn install
+      - name: Typecheck standalone CLI
+        shell: bash
+        run: yarn typecheck:cli
+      - name: Build standalone macOS CLI
+        shell: bash
+        run: yarn workspace avti-cli dist:mac
+      - name: Sign and notarize macOS CLI
+        shell: bash
+        env:
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_NOTARY_KEY_P8_BASE64: ${{ secrets.APPLE_NOTARY_KEY_P8_BASE64 }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        run: bash avti-cli/scripts/sign-notarize-macos.sh "avti-cli/dist/avti-macos-${{ matrix.arch }}"
+      - name: Smoke-test signed macOS CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          reported=$("avti-cli/dist/avti-macos-${{ matrix.arch }}/avti" --version)
+          if [[ "$reported" != '${{ needs.metadata.outputs.version }}' ]]; then
+            echo "Signed portable CLI reported $reported instead of ${{ needs.metadata.outputs.version }}" >&2
+            exit 1
+          fi
+      - name: Create tarball and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd avti-cli/dist
+          tar -czf "avti-macos-${{ matrix.arch }}.tar.gz" "avti-macos-${{ matrix.arch }}"
+          shasum -a 256 "avti-macos-${{ matrix.arch }}.tar.gz" > "avti-macos-${{ matrix.arch }}.sha256"
+      - name: Smoke-test extracted macOS CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          smoke="$RUNNER_TEMP/avti-cli-macos-${{ matrix.arch }}-smoke"
+          rm -rf "$smoke"
+          mkdir -p "$smoke"
+          tar -xzf "avti-cli/dist/avti-macos-${{ matrix.arch }}.tar.gz" -C "$smoke"
+          reported=$("$smoke/avti-macos-${{ matrix.arch }}/avti" --version)
+          if [[ "$reported" != '${{ needs.metadata.outputs.version }}' ]]; then
+            echo "Portable CLI reported $reported instead of ${{ needs.metadata.outputs.version }}" >&2
+            exit 1
+          fi
+      - name: Upload macOS release files
+        uses: actions/upload-artifact@v4
+        with:
+          name: avti-cli-macos-${{ matrix.arch }}
+          path: |
+            avti-cli/dist/avti-macos-${{ matrix.arch }}.tar.gz
+            avti-cli/dist/avti-macos-${{ matrix.arch }}.sha256
+          if-no-files-found: error
+
+  publish:
+    name: Publish Avti CLI release
+    needs: [metadata, windows-cli, macos-cli]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download release files
+        uses: actions/download-artifact@v4
+        with:
+          pattern: avti-cli-*
+          path: release
+          merge-multiple: true
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.metadata.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
+          RELEASE_TARGET: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(release/*)
+          if (( ${#files[@]} == 0 )); then
+            echo 'No CLI release artifacts were downloaded.' >&2
+            exit 1
+          fi
+
+          if gh release view "$RELEASE_TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "${files[@]}" --repo "$GH_REPO" --clobber
+            exit 0
+          fi
+
+          notes="$RUNNER_TEMP/avti-cli-release-notes.md"
+          printf '%s\n' \
+            "## Avti CLI $RELEASE_VERSION" \
+            '' \
+            'Standalone terminal agent for local projects. Avti Desktop, Node.js and Yarn are not required.' \
+            '' \
+            'Artifacts:' \
+            '- Windows x64: avti-windows-x64.zip' \
+            '- macOS Apple Silicon: avti-macos-arm64.tar.gz' \
+            '- macOS Intel: avti-macos-x64.tar.gz' \
+            '' \
+            'Each platform artifact has a matching SHA-256 manifest.' \
+            'macOS artifacts are Developer ID signed and notarized by Apple.' \
+            'Windows code signing is handled independently.' \
+            > "$notes"
+
+          gh release create "$RELEASE_TAG" "${files[@]}" \
+            --repo "$GH_REPO" \
+            --target "$RELEASE_TARGET" \
+            --title "Avti CLI $RELEASE_VERSION" \
+            --notes-file "$notes"
