@@ -102,10 +102,6 @@ const RESTORE_CURSOR = `${ESC}u`
 const MOVE_DOWN = `${ESC}1B`
 const CLEAR_DOWN = `${ESC}J`
 
-interface WritableReadline extends Interface {
-  write(data: string | null, key?: { readonly ctrl?: boolean; readonly name?: string }): void
-}
-
 interface MutableKeypress {
   name?: string
   sequence?: string
@@ -132,10 +128,9 @@ function currentReadlineLine(readline: Interface): string {
 }
 
 function replaceReadlineLine(readline: Interface, next: string): void {
-  const writable = readline as WritableReadline
-  writable.write(null, { ctrl: true, name: 'a' })
-  writable.write(null, { ctrl: true, name: 'k' })
-  writable.write(next)
+  readline.write(null, { ctrl: true, name: 'a' })
+  readline.write(null, { ctrl: true, name: 'k' })
+  readline.write(next)
 }
 
 function renderPalette(
