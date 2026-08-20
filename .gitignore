@@ -11,4 +11,7 @@ node_modules/
 
 dsh-plugin-desktop/dist/
 dsh-plugin-desktop/lib/
+dsh-plugin-desktop/build/*.png
 dsh-community-market/lib/
+avti-cli/lib/
+avti-cli/dist/

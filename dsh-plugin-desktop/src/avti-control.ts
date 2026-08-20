@@ -11,11 +11,8 @@ import { loadLayeredEnv } from '@deepseek-ai/dsh-app-boot'
 import type {} from '@deepseek-ai/dsh-session-persistence'
 import type {} from '@deepseek-ai/dsh-session-query'
 import { AVTI_ANTIGRAVITY_BASE_URL, AVTI_ANTIGRAVITY_PROVIDER } from './avti-antigravity.ts'
+import { runProfile } from './avti-profile-boot.ts'
 import { packagedDependencyPath } from './packaged-runtime-path.ts'
-
-const PROFILE_BOOT_URL = pathToFileURL(
-  packagedDependencyPath(import.meta.url, '@deepseek-ai/dsh/lib/profile-boot.js'),
-).href
 
 const CONTROL_PATCH = `# Avti control commands need Harness services, not the one-shot runner.
 - id: headless-startup
@@ -25,22 +22,13 @@ const CONTROL_PATCH = `# Avti control commands need Harness services, not the on
 `
 
 interface ProcessShutdown { shutdown(code: number): Promise<void> }
-interface ProfileBootModule {
-  runProfile(options: {
-    environment: ReturnType<typeof loadLayeredEnv>
-    profile: string
-    patchFiles: readonly string[]
-    args: readonly string[]
-  }): Promise<{ ctx: Context; shutdown: ProcessShutdown }>
-}
 
 async function bootControl(providerPatchPath?: string): Promise<{ ctx: Context; shutdown: ProcessShutdown }> {
   const root = mkdtempSync(join(tmpdir(), 'avti-control-'))
   const patchPath = join(root, 'control.patch.yml')
   writeFileSync(patchPath, CONTROL_PATCH)
   try {
-    const module = await import(PROFILE_BOOT_URL) as unknown as ProfileBootModule
-    return await module.runProfile({
+    return await runProfile({
       environment: loadLayeredEnv('dsh'),
       profile: 'headless',
       patchFiles: [patchPath, ...(providerPatchPath === undefined ? [] : [providerPatchPath])],

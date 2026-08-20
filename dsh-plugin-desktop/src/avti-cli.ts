@@ -10,8 +10,10 @@ import {
 } from './avti-antigravity.ts'
 import { runAvtiControl } from './avti-control.ts'
 import { runAvtiInteractive } from './avti-interactive.ts'
+import { runAvtiPresentation } from './avti-presentation.ts'
 import { packagedDependencyPath } from './packaged-runtime-path.ts'
 import { renderAvtiIntro } from './avti-terminal-style.ts'
+import { loadAvtiTheme } from './avti-theme.ts'
 
 const RUN_AS_NODE = 'ELECTRON_RUN_AS_NODE'
 const DSH_HOME = 'DSH_HOME'
@@ -22,13 +24,15 @@ const DSH_ENTRY_URL = pathToFileURL(
 
 const AVTI_CONTROL_COMMANDS = new Set(['status', 'models', 'model', 'sessions', 'doctor'])
 
-export const AVTI_CLI_HELP = `AVTI
+export const AVTI_CLI_HELP = `AVTI // AGENTIC TERMINAL PLATFORM
 
 Usage:
   avti                            start an interactive session in this project
   avti <task>                     run one task and exit
   avti resume <session-id>        continue a saved CLI session from this project
-  avti status                     show project and CLI default model
+  avti demo                       run live autonomous agent presentation & showcase
+  avti presentation               run live interactive presentation walkthrough
+  avti status                     show project telemetry, active model and context
   avti models [provider]          list available models
   avti model [provider] <model>   show or change the CLI default model
   avti sessions                   list recent CLI sessions for this project
@@ -43,7 +47,8 @@ Options:
 
 Interactive commands:
   /help                           show terminal commands
-  /status                         show project, model and session
+  /status                         show telemetry HUD, model and session
+  /presentation, /demo            run live autonomous agent presentation showcase
   /models [provider]              list available models
   /model [provider] <model>       show or change model for following turns
   /sessions                       show recent project sessions
@@ -54,6 +59,9 @@ Model bridges:
   antigravity                     ClaudeGravity-compatible local provider
                                   proxy: http://127.0.0.1:8080
 
+Themes:
+  aurora (signature), antigravity, solar-amber, cyber-matrix, ice-slate, clean-mono
+
 State:
   default home                    ~/.avti/cli
   AVTI_CLI_HOME                   override the Avti CLI home
@@ -62,6 +70,7 @@ State:
 Examples:
   avti
   avti "run the tests and fix failures"
+  avti demo
   avti sessions
   avti resume avti-<session-id>
   avti status
@@ -83,6 +92,7 @@ export type AvtiLocalInvocation =
   | { readonly mode: 'interactive' }
   | { readonly mode: 'help' }
   | { readonly mode: 'version' }
+  | { readonly mode: 'presentation'; readonly fast?: boolean }
 
 export interface AvtiResumeInvocation {
   readonly mode: 'resume'
@@ -149,6 +159,9 @@ export function resolveAvtiInvocation(args: readonly string[]): AvtiInvocation {
   if (args.length === 1 && (args[0] === '-V' || args[0] === '--version')) return { mode: 'version' }
 
   const first = args[0]!
+  if (first === 'demo' || first === 'presentation') {
+    return { mode: 'presentation', fast: args.includes('--fast') }
+  }
   if (first === 'resume') {
     const sessionId = args[1]
     if (sessionId === undefined || sessionId.trim() === '') {
@@ -194,6 +207,11 @@ export async function runAvtiCli(
   }
   if (invocation.mode === 'version') {
     process.stdout.write(`${packageVersion()}\n`)
+    return
+  }
+  if (invocation.mode === 'presentation') {
+    const theme = loadAvtiTheme(environment)
+    await runAvtiPresentation({ theme, fast: invocation.fast })
     return
   }
 

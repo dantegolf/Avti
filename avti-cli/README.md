@@ -110,25 +110,46 @@ The macOS releases are intentionally architecture-specific instead of pretending
 ## Usage
 
 ```text
-avti                            interactive session in the current project
+avti                            interactive session with Quantum Singularity HUD
 avti <task>                     one-shot task
-avti status                     project and CLI default model
-avti models [provider]          available models
+avti demo                       run live presentation & autonomous agent showcase
+avti presentation               run live interactive presentation walkthrough
+avti status                     show telemetry HUD, active model and context
+avti models [provider]          list available models
 avti model [provider] <model>   show or change the CLI default model
-avti sessions                   recent CLI sessions for this project
+avti sessions                   list recent CLI sessions for this project
 avti resume <session-id>        continue a persisted CLI session
 avti doctor                     check CLI runtime and project services
 ```
 
-### Slash command palette
+### Quantum Singularity HUD & Telemetry Deck
 
-Start interactive Avti and type `/`. Avti renders matching commands live below the prompt. Continue typing to filter them (`/mo` narrows to `/model` and `/models`) or press `Tab` to use readline completion.
+On launch, Avti renders its signature Quantum Singularity Core (a precision ANSI half-block `▀▄` geometric emblem) alongside an interactive Holographic Telemetry Deck showing:
+- **Active Model & Provider Bridge** (e.g. Antigravity Local Proxy / Gemini 3.7 Flash High)
+- **Git Branch & Workspace Horizon**
+- **Segmented Context Progress Bar** with memory pressure indicators (`[████████░░░░] 52%`)
+- **Real-time TPS Speed Gauge & ASCII Sparklines** (` ▂▃▅▆▇█ 95.2 tps`)
+- **Pro-Tips Carousel**
 
-The palette is built from both Avti-owned commands and the native Harness command registry. Harness commands supplied by current or future command plugins therefore appear automatically without a second hard-coded list.
+### Interactive Presentation Mode
 
-Interactive Avti commands include `/status`, `/models`, `/model`, `/sessions`, `/theme`, `/help` and `/exit`. Other registered slash commands are delegated to Harness.
+Run:
 
-### Terminal themes
+```bash
+avti demo
+# or within an interactive session:
+/presentation
+```
+
+This launches a live, scripted autonomous software engineering showcase demonstrating multi-stage cognitive planning, AST analysis, grep discovery, code modification with syntax-colored ANSI diff cards, test suite execution, and a verified high-throughput runtime scorecard in under 2 seconds.
+
+### Slash Command Palette
+
+Start interactive Avti and type `/`. Avti opens a floating popover palette categorized into `[Core]`, `[Model]`, `[Theme]`, `[Session]`, `[Showcase]` and `[Diagnostics]`. Continue typing to filter or press `Tab` to autocomplete.
+
+Interactive Avti commands include `/status`, `/presentation`, `/demo`, `/models`, `/model`, `/sessions`, `/theme`, `/doctor`, `/help` and `/exit`.
+
+### Terminal Themes
 
 Run:
 
@@ -136,22 +157,29 @@ Run:
 /theme
 ```
 
-Available themes are:
+Available themes in the Avti Aurora Spectrum:
 
 ```text
-claude      Claude Warm
-midnight    Midnight
-forest      Forest
-mono        Mono
+aurora          Avti Aurora (Signature Electric Cyan & Quantum Purple on Obsidian)
+antigravity     Antigravity Core (Deep Cyber Violet & Neon Magenta Singularity)
+solar-amber     Solar Amber (Warm Cyberpunk Golden CRT phosphor glow)
+cyber-matrix    Cyber Matrix (Phosphor Matrix Green & High-Tech Terminal Jade)
+ice-slate       Ice Slate (Nordic Frost & Arctic Glacial Slate Blue)
+clean-mono      Clean Mono (Minimalist high-contrast monochrome)
+claude          Claude Warm (Warm orange accent)
+midnight        Midnight (Cool cyan accent)
+forest          Forest (Muted green accent)
+mono            Mono (Plain text without styling)
 ```
 
 Select one with, for example:
 
 ```text
-/theme midnight
+/theme aurora
+/theme antigravity
 ```
 
-The choice is persisted in the CLI home and affects subsequent prompts. `AVTI_THEME` can override it for one process, and `NO_COLOR` remains respected.
+The choice is persisted in the CLI home (`~/.avti/cli/ui.json`) and applies to all future sessions. `AVTI_THEME` can override it for a single process, and `NO_COLOR` is strictly respected.
 
 ## ClaudeGravity / Antigravity models
 

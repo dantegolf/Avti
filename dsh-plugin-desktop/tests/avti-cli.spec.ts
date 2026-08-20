@@ -142,9 +142,12 @@ describe('Avti CLI presentation', () => {
     expect(output).toBe('  · Reading project\n  × Could not read project\n')
   })
 
-  it('offers persistent terminal themes with a Claude-like warm default', () => {
-    expect(AVTI_THEMES.map(theme => theme.id)).toEqual(['claude', 'midnight', 'forest', 'mono'])
+  it('offers persistent terminal themes including signature aurora and classic options', () => {
+    expect(AVTI_THEMES.map(theme => theme.id)).toContain('aurora')
+    expect(AVTI_THEMES.map(theme => theme.id)).toContain('antigravity')
+    expect(AVTI_THEMES.map(theme => theme.id)).toContain('claude')
     expect(resolveAvtiTheme('CLAUDE')?.name).toBe('Claude Warm')
+    expect(resolveAvtiTheme('AURORA')?.name).toBe('Avti Aurora')
     expect(formatAvtiPrompt(AVTI_THEMES[0]!, { isTTY: false }, {})).toBe('› ')
   })
 
