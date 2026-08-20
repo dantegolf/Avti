@@ -25,6 +25,9 @@
 3. Connect an AI provider and select a model.
 4. Create a new session and start working.
 
+When [ClaudeGravity](https://github.com/dantegolf/ClaudeGravity-) is running locally,
+its provider and models are available in the model list as `ClaudeGravity`.
+
 Avti users do not need Node.js, Yarn, or a source checkout. Those are development requirements only.
 
 ## Install on Windows

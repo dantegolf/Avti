@@ -25,6 +25,9 @@
 3. 连接 AI Provider 并选择模型。
 4. 新建会话并开始工作。
 
+当 [ClaudeGravity](https://github.com/dantegolf/ClaudeGravity-) 在本机运行时，
+其本地 Provider 和模型会以 `ClaudeGravity` 名称显示在模型列表中。
+
 普通用户不需要 Node.js、Yarn，也不需要手动构建源码；这些仅用于开发。
 
 ## Windows 安装

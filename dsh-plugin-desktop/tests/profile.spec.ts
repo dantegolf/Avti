@@ -252,6 +252,27 @@ describe('desktop profile composition', {
     expect(rows.find(row => row.id === 'desktop-profiles')).toEqual(expect.objectContaining({
       name: 'dsh-plugin-desktop/profiles',
     }))
+
+    const claudeGravity = (rows.find(row => row.id === 'llm-pi-ai')?.config as {
+      providers?: Record<string, {
+        displayName?: string
+        api?: string
+        baseURL?: string
+        headers?: Record<string, string>
+        models?: Array<{ id: string, contextWindow: number }>
+      }>
+    } | undefined)?.providers?.claudegravity
+    expect(claudeGravity).toEqual(expect.objectContaining({
+      displayName: 'ClaudeGravity',
+      api: 'anthropic-messages',
+      baseURL: 'http://127.0.0.1:8080',
+      headers: { 'x-api-key': 'antigravity' },
+    }))
+    expect(claudeGravity?.models).toHaveLength(22)
+    expect(claudeGravity?.models).toContainEqual({
+      id: 'gemini-2.5-pro',
+      contextWindow: 2_000_000,
+    })
   })
 
   it('boots a selected Web profile without overriding its compatibility UI rows', () => {
