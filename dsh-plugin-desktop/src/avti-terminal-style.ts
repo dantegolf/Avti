@@ -1,24 +1,10 @@
 /** Avti terminal presentation primitives for the Harness CLI wrapper. */
 
 import type { WriteStream } from 'node:tty'
-import { styleAvtiTone, type AvtiTheme } from './avti-theme.ts'
+import { loadAvtiTheme, styleAvtiTone, type AvtiTheme } from './avti-theme.ts'
 
-/** Quiet orbital motion used for transient Avti thinking states. */
 export const AVTI_ORBIT_FRAMES = ['◜', '◝', '◞', '◟'] as const
-
-/** Horizontal pulse for concrete tool activity. */
-export const AVTI_PULSE_FRAMES = [
-  '∙····',
-  '·∙···',
-  '··∙··',
-  '···∙·',
-  '····∙',
-  '···∙·',
-  '··∙··',
-  '·∙···',
-] as const
-
-/** One-shot startup reveal. It is intentionally short and disappears into the native CLI. */
+export const AVTI_PULSE_FRAMES = ['∙····', '·∙···', '··∙··', '···∙·', '····∙', '···∙·', '··∙··', '·∙···'] as const
 export const AVTI_INTRO_FRAMES = ['A', 'AV', 'AVT', 'AVTI'] as const
 
 export interface AvtiTerminalOutput {
@@ -71,31 +57,35 @@ export function terminalMotionEnabled(
   return true
 }
 
+function activeTheme(environment: NodeJS.ProcessEnv): AvtiTheme {
+  return loadAvtiTheme(environment)
+}
+
 export function formatAvtiActivity(frame: string, label: string): string {
   return `  ${frame} ${label}`
 }
 
 export function formatAvtiSuccess(label: string): string {
-  return `  ✓ ${label}`
+  const theme = activeTheme(process.env)
+  return `  ${styleAvtiTone('✓', 'success', theme)} ${styleAvtiTone(label, 'muted', theme)}`
 }
 
 export function formatAvtiFailure(label: string): string {
-  return `  × ${label}`
+  const theme = activeTheme(process.env)
+  return `  ${styleAvtiTone('×', 'error', theme)} ${styleAvtiTone(label, 'muted', theme)}`
 }
 
 function styledActivity(frame: string, label: string, options: AvtiActivityOptions): string {
-  const theme = options.theme
-  if (theme === undefined) return formatAvtiActivity(frame, label)
   const output = options.output ?? process.stdout
   const environment = options.environment ?? process.env
+  const theme = options.theme ?? activeTheme(environment)
   return `  ${styleAvtiTone(frame, 'accent', theme, output, environment)} ${styleAvtiTone(label, 'muted', theme, output, environment)}`
 }
 
 function styledCompletion(symbol: string, label: string, tone: 'success' | 'error', options: AvtiActivityOptions): string {
-  const theme = options.theme
-  if (theme === undefined) return tone === 'success' ? formatAvtiSuccess(label) : formatAvtiFailure(label)
   const output = options.output ?? process.stdout
   const environment = options.environment ?? process.env
+  const theme = options.theme ?? activeTheme(environment)
   return `  ${styleAvtiTone(symbol, tone, theme, output, environment)} ${styleAvtiTone(label, 'muted', theme, output, environment)}`
 }
 
@@ -173,7 +163,7 @@ export function createAvtiActivity(options: AvtiActivityOptions = {}): AvtiActiv
 }
 
 export function formatAvtiAssistantLabel(
-  theme: AvtiTheme,
+  theme: AvtiTheme = activeTheme(process.env),
   output: { readonly isTTY?: boolean } = process.stdout,
   environment: NodeJS.ProcessEnv = process.env,
 ): string {
@@ -192,26 +182,30 @@ export function formatAvtiWelcome(
   const orbit = styleAvtiTone('◇', 'accent', theme, output, environment)
   const project = styleAvtiTone(context.project, 'text', theme, output, environment)
   const model = styleAvtiTone(`${context.provider}/${context.model}`, 'muted', theme, output, environment)
-  const hint = styleAvtiTone('/ commands · esc closes menus', 'subtle', theme, output, environment)
+  const hint = styleAvtiTone('/ commands · ↑↓ navigate · esc closes menus', 'subtle', theme, output, environment)
   return `${orbit} ${brand}\n  ${project}  ${styleAvtiTone('·', 'subtle', theme, output, environment)}  ${model}\n  ${hint}\n\n`
 }
 
 export async function renderAvtiIntro(options: AvtiMotionOptions = {}): Promise<void> {
   const output = options.output ?? process.stdout
   const environment = options.environment ?? process.env
-  const frameDelayMs = options.frameDelayMs ?? 110
+  const frameDelayMs = options.frameDelayMs ?? 80
   const sleep = options.sleep ?? defaultSleep
 
   if (output.isTTY !== true || environment.CI !== undefined) return
+  const theme = activeTheme(environment)
   if (!terminalMotionEnabled(output, environment)) {
-    output.write('AVTI\n\n')
+    output.write(`${styleAvtiTone('◇ AVTI', 'accentBright', theme, output, environment)}\n\n`)
     return
   }
 
   for (let index = 0; index < AVTI_INTRO_FRAMES.length; index += 1) {
-    output.write(`${ERASE_LINE}${CURSOR_COLUMN_ZERO}${AVTI_INTRO_FRAMES[index]}`)
+    const frame = index + 1 === AVTI_INTRO_FRAMES.length
+      ? `◇ ${AVTI_INTRO_FRAMES[index]}`
+      : AVTI_INTRO_FRAMES[index]!
+    output.write(`${ERASE_LINE}${CURSOR_COLUMN_ZERO}${styleAvtiTone(frame, index + 1 === AVTI_INTRO_FRAMES.length ? 'accentBright' : 'accent', theme, output, environment)}`)
     if (index + 1 < AVTI_INTRO_FRAMES.length) await sleep(frameDelayMs)
   }
-  await sleep(160)
+  await sleep(120)
   output.write('\n\n')
 }
