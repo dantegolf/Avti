@@ -4,6 +4,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import {
   createAvtiSlashCompleter,
   filterAvtiCommandSuggestions,
+  layoutAvtiSlashPalette,
   listAvtiCommandSuggestions,
   nextAvtiSlashPaletteState,
 } from '../src/avti-command-palette.ts'
@@ -23,22 +24,55 @@ describe('Avti slash command shelf', () => {
 
     expect(filterAvtiCommandSuggestions('/', suggestions).map(item => item.command)).toContain('/model')
     expect(filterAvtiCommandSuggestions('/mo', suggestions).map(item => item.command)).toEqual([
-      '/models',
       '/model',
+      '/models',
     ])
     expect(filterAvtiCommandSuggestions('/model ', suggestions)).toEqual([])
     expect(filterAvtiCommandSuggestions('hello', suggestions)).toEqual([])
   })
 
-  it('bounds the root slash shelf instead of dumping the entire command registry', () => {
+  it('bounds bare slash more aggressively without limiting explicit completion', () => {
     const suggestions = Array.from({ length: 20 }, (_, index) => ({
       command: `/command-${index}`,
       description: `command ${index}`,
       source: 'harness' as const,
     }))
 
-    expect(filterAvtiCommandSuggestions('/', suggestions)).toHaveLength(6)
+    expect(filterAvtiCommandSuggestions('/', suggestions)).toHaveLength(5)
     expect(filterAvtiCommandSuggestions('/command-1', suggestions, Number.POSITIVE_INFINITY)).toHaveLength(11)
+  })
+
+  it('keeps every painted row within the terminal width and reports hidden matches', () => {
+    const suggestions = Array.from({ length: 12 }, (_, index) => ({
+      command: `/plugin-command-${index}`,
+      hint: index === 0 ? '[a-very-long-argument-placeholder]' : undefined,
+      description: `Long plugin description ${index} that would otherwise wrap across physical terminal rows\nwith an accidental newline`,
+      source: 'harness' as const,
+    }))
+
+    const layout = layoutAvtiSlashPalette(
+      '/plugin',
+      suggestions,
+      { dismissed: false, selectedIndex: 0 },
+      52,
+    )
+
+    expect(layout.rows).toHaveLength(8)
+    expect(layout.hiddenMatches).toBe(4)
+    expect(layout.footer).toContain('+4 more')
+    for (const row of layout.rows) {
+      const visible = `  ${row.selected ? '›' : ' '} ${row.command}${row.description === '' ? '' : `  ${row.description}`}`
+      expect(visible.length).toBeLessThanOrEqual(51)
+      expect(visible).not.toContain('\n')
+    }
+    expect(layout.footer.length).toBeLessThanOrEqual(51)
+  })
+
+  it('does not paint a shelf in a terminal too narrow for safe one-line rows', () => {
+    const suggestions = [
+      { command: '/model', description: 'model', source: 'avti' as const },
+    ]
+    expect(layoutAvtiSlashPalette('/', suggestions, { dismissed: false, selectedIndex: 0 }, 26).rows).toEqual([])
   })
 
   it('supports sticky Escape dismissal and arrow selection state', () => {

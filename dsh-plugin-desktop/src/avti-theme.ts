@@ -27,25 +27,26 @@ function ansi256(index: number): string {
 }
 
 /**
- * Avti's CLI identity is intentionally different from Claude Code's warm orange:
- * monochrome product branding, cool electric highlights, and restrained status colors.
+ * The default palette follows the low-noise hierarchy used by modern coding CLIs:
+ * one warm product accent, quiet graphite neutrals, and status colors only when
+ * they communicate state. Avti keeps its own symbols and product identity.
  */
 export const AVTI_THEMES: readonly AvtiTheme[] = [
   {
     id: 'orbit',
     name: 'Avti Orbit',
-    description: 'Graphite, ice-white and electric cyan',
+    description: 'Warm coral on graphite with quiet neutral text',
     tones: {
-      accent: ansi256(81),
-      accentBright: ansi256(159),
+      accent: ansi256(209),
+      accentBright: ansi256(216),
       text: ansi256(252),
       muted: ansi256(245),
-      subtle: ansi256(240),
+      subtle: ansi256(239),
       success: ansi256(114),
       warning: ansi256(221),
       error: ansi256(203),
     },
-    selectionAnsi: `${ESC}48;5;24m${ESC}38;5;231m`,
+    selectionAnsi: `${ESC}48;5;236m${ESC}38;5;216m`,
   },
   {
     id: 'midnight',
@@ -199,7 +200,7 @@ export function formatAvtiPromptContext(
   output: { readonly isTTY?: boolean } = process.stdout,
   environment: NodeJS.ProcessEnv = process.env,
 ): string {
-  const rail = styleAvtiTone('╭─', 'subtle', theme, output, environment)
+  const rail = styleAvtiTone('─', 'subtle', theme, output, environment)
   const brand = styleAvtiTone('AVTI', 'accent', theme, output, environment)
   const project = styleAvtiTone(context.project, 'text', theme, output, environment)
   const model = styleAvtiTone(`${context.provider}/${context.model}`, 'muted', theme, output, environment)
