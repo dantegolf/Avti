@@ -120,13 +120,28 @@ avti resume <session-id>        continue a persisted CLI session
 avti doctor                     check CLI runtime and project services
 ```
 
-### Slash command palette
+## Avti Orbit terminal UI
 
-Start interactive Avti and type `/`. Avti renders matching commands live below the prompt. Continue typing to filter them (`/mo` narrows to `/model` and `/models`) or press `Tab` to use readline completion.
+The terminal presentation uses a small Avti-owned visual system instead of inheriting provider branding. The default **Orbit** theme extends the product's black/white identity with a cool electric accent for interaction, graphite secondary text, and restrained success/warning/error states.
 
-The root palette is intentionally bounded instead of dumping the whole command registry. Press `Esc` to close it without changing the current input. Dismissal stays in effect while you continue editing the same slash token; once you leave slash-command mode (for example, erase `/`), typing `/` again opens the palette normally.
+Conversation turns use a distinct Avti marker, tool activity uses the orbit/pulse motion language, prompts use a compact rail, and interactive lists share the same border, muted-text and selected-row vocabulary. `NO_COLOR` and non-TTY output remain plain and automation-safe.
 
-The palette is built from both Avti-owned commands and the native Harness command registry. Harness commands supplied by current or future command plugins therefore appear automatically without a second hard-coded list.
+### Slash command shelf
+
+Start interactive Avti and type `/`. A bounded command shelf appears below the prompt. Continue typing to filter it (`/mo` narrows to `/model` and `/models`).
+
+Keyboard behavior:
+
+```text
+↑ / ↓       move selection
+Enter       accept a partial selected command; submit when already complete
+Tab         complete the selected command
+Esc         close the shelf for the current slash token
+```
+
+The shelf never dumps the entire command registry at once. Escape dismissal stays in effect while you continue editing the same slash token; once you erase/leave slash-command mode, typing `/` again opens discovery normally.
+
+The catalog merges Avti-owned commands with the native Harness command registry, so current and future plugin commands appear automatically without a second hard-coded list.
 
 Interactive Avti commands include `/status`, `/models`, `/model`, `/sessions`, `/theme`, `/help` and `/exit`. Other registered slash commands are delegated to Harness.
 
@@ -141,10 +156,10 @@ Run:
 Available themes are:
 
 ```text
-claude      Claude Warm
-midnight    Midnight
-forest      Forest
-mono        Mono
+orbit       Avti Orbit      graphite + ice-white + electric cyan
+midnight    Avti Midnight   violet/blue dark-terminal variant
+forest      Avti Forest     muted green variant
+mono        Avti Mono       no color escapes
 ```
 
 Select one with, for example:
@@ -153,7 +168,7 @@ Select one with, for example:
 /theme midnight
 ```
 
-The choice is persisted in the CLI home and affects subsequent prompts. `AVTI_THEME` can override it for one process, and `NO_COLOR` remains respected.
+The choice is persisted in the CLI home and affects prompts, command shelves, control panels and activity rows. `AVTI_THEME` can override it for one process, and `NO_COLOR` remains respected. Old preview configs that stored `claude` migrate to `orbit` automatically.
 
 ## ClaudeGravity / Antigravity models
 
