@@ -5,7 +5,7 @@ import {
   createAvtiSlashCompleter,
   filterAvtiCommandSuggestions,
   listAvtiCommandSuggestions,
-  nextAvtiSlashPaletteVisibility,
+  nextAvtiSlashPaletteState,
 } from '../src/avti-command-palette.ts'
 import {
   AVTI_ANTIGRAVITY_MODELS,
@@ -14,7 +14,7 @@ import {
   withAvtiAntigravityPatch,
 } from '../src/avti-antigravity.ts'
 
-describe('Avti slash command palette', () => {
+describe('Avti slash command shelf', () => {
   it('filters built-in commands live from a slash prefix', () => {
     const suggestions = listAvtiCommandSuggestions(
       { get: vi.fn(() => undefined) } as unknown as Context,
@@ -30,31 +30,36 @@ describe('Avti slash command palette', () => {
     expect(filterAvtiCommandSuggestions('hello', suggestions)).toEqual([])
   })
 
-  it('bounds the root slash menu instead of dumping the entire command registry', () => {
+  it('bounds the root slash shelf instead of dumping the entire command registry', () => {
     const suggestions = Array.from({ length: 20 }, (_, index) => ({
       command: `/command-${index}`,
       description: `command ${index}`,
       source: 'harness' as const,
     }))
 
-    expect(filterAvtiCommandSuggestions('/', suggestions)).toHaveLength(7)
+    expect(filterAvtiCommandSuggestions('/', suggestions)).toHaveLength(6)
     expect(filterAvtiCommandSuggestions('/command-1', suggestions, Number.POSITIVE_INFINITY)).toHaveLength(11)
   })
 
-  it('keeps Escape dismissal sticky until slash-command mode is left', () => {
-    let visibility = { dismissed: false }
+  it('supports sticky Escape dismissal and arrow selection state', () => {
+    let state = { dismissed: false, selectedIndex: 0 }
 
-    visibility = nextAvtiSlashPaletteVisibility(visibility, '/', 'escape')
-    expect(visibility).toEqual({ dismissed: true })
+    state = nextAvtiSlashPaletteState(state, '/', 'down', 3)
+    expect(state).toEqual({ dismissed: false, selectedIndex: 1 })
+    state = nextAvtiSlashPaletteState(state, '/', 'up', 3)
+    expect(state).toEqual({ dismissed: false, selectedIndex: 0 })
+    state = nextAvtiSlashPaletteState(state, '/', 'up', 3)
+    expect(state).toEqual({ dismissed: false, selectedIndex: 2 })
 
-    visibility = nextAvtiSlashPaletteVisibility(visibility, '/mo', 'm')
-    expect(visibility).toEqual({ dismissed: true })
+    state = nextAvtiSlashPaletteState(state, '/', 'escape', 3)
+    expect(state).toEqual({ dismissed: true, selectedIndex: 2 })
+    state = nextAvtiSlashPaletteState(state, '/mo', 'down', 2)
+    expect(state).toEqual({ dismissed: true, selectedIndex: 2 })
 
-    visibility = nextAvtiSlashPaletteVisibility(visibility, '', 'backspace')
-    expect(visibility).toEqual({ dismissed: false })
-
-    visibility = nextAvtiSlashPaletteVisibility(visibility, '/', '/')
-    expect(visibility).toEqual({ dismissed: false })
+    state = nextAvtiSlashPaletteState(state, '', 'backspace', 0)
+    expect(state).toEqual({ dismissed: false, selectedIndex: 0 })
+    state = nextAvtiSlashPaletteState(state, '/', '/', 3)
+    expect(state).toEqual({ dismissed: false, selectedIndex: 0 })
   })
 
   it('merges native Harness plugin commands without duplicating Avti commands', () => {
