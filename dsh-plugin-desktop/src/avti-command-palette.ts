@@ -1,19 +1,12 @@
-/**
- * Live slash-command discovery & palette for Avti Terminal.
- */
+/** Live slash-command discovery for Avti's terminal input. */
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { Interface } from 'node:readline/promises'
 import {
-  AVTI_THEMES,
-  BOLD,
-  DIM,
   loadAvtiTheme,
-  RESET,
   styleAvtiTone,
   type AvtiTheme,
-  type AvtiTone,
 } from './avti-theme.ts'
 
 export type AvtiCommandCategory =
@@ -33,7 +26,6 @@ export interface AvtiCommandSuggestion {
   readonly source: 'avti' | 'harness'
 }
 
-/** Avti-owned commands with rich category tags and showcase modes. */
 export const AVTI_COMMAND_SUGGESTIONS: readonly AvtiCommandSuggestion[] = [
   { command: '/help', description: 'Show terminal commands and keybindings', category: 'Core', source: 'avti' },
   { command: '/status', description: 'Show telemetry HUD, model, and session state', category: 'Core', source: 'avti' },
@@ -44,7 +36,7 @@ export const AVTI_COMMAND_SUGGESTIONS: readonly AvtiCommandSuggestion[] = [
   { command: '/presentation', description: 'Run live interactive autonomous agent showcase', hint: '[scenario]', category: 'Showcase', source: 'avti' },
   { command: '/demo', description: 'Run fast-paced CLI performance & tool demonstration', category: 'Showcase', source: 'avti' },
   { command: '/doctor', description: 'Check runtime health, workspace permissions & provider', category: 'Diagnostics', source: 'avti' },
-  { command: '/exit', description: 'Exit Avti terminal session', category: 'Core', source: 'avti' },
+  { command: '/exit', description: 'Leave Avti', category: 'Core', source: 'avti' },
 ] as const
 
 export const AVTI_SLASH_ROOT_LIMIT = 5
@@ -195,21 +187,211 @@ export function layoutAvtiSlashPalette(
   return { rows, footer, totalMatches: allMatches.length, hiddenMatches }
 }
 
+const ESC = String.fromCharCode(27) + '['
+const ERASE_LINE = ESC + '2K'
+const HIDE_CURSOR = ESC + '?25l'
+const SHOW_CURSOR = ESC + '?25h'
+
+interface MutableKeypress {
+  name?: string
+  sequence?: string
+  ctrl?: boolean
+  meta?: boolean
+  shift?: boolean
+}
+
 export interface AvtiSlashPaletteOptions {
   readonly readline: Interface
   readonly getSuggestions: () => readonly AvtiCommandSuggestion[]
   readonly getTheme?: () => AvtiTheme
+  readonly theme?: AvtiTheme
   readonly input?: NodeJS.ReadStream
   readonly output?: NodeJS.WriteStream
-  readonly theme?: AvtiTheme
 }
 
-/**
- * Ask for the main Avti task with zero-flicker native readline input and tab autocompletion.
- */
+function currentReadlineLine(readline: Interface): string {
+  const value = (readline as Interface & { readonly line?: unknown }).line
+  return typeof value === 'string' ? value : ''
+}
+
+function currentCursorColumn(readline: Interface): number {
+  try {
+    return readline.getCursorPos().cols
+  } catch {
+    return 0
+  }
+}
+
+function replaceReadlineLine(readline: Interface, next: string): void {
+  readline.write(null, { ctrl: true, name: 'a' })
+  readline.write(null, { ctrl: true, name: 'k' })
+  readline.write(next)
+}
+
+function moveVertical(rows: number): string {
+  if (rows === 0) return ''
+  return rows > 0 ? `${ESC}${rows}B` : `${ESC}${Math.abs(rows)}A`
+}
+
+function moveToColumn(column: number): string {
+  return `${ESC}${Math.max(1, column + 1)}G`
+}
+
+function paintPaletteRows(
+  output: NodeJS.WriteStream,
+  rows: readonly string[],
+  previousRowCount: number,
+  cursorColumn: number,
+): number {
+  if (output.isTTY !== true) return 0
+  const rowCount = Math.max(rows.length, previousRowCount)
+  if (rowCount === 0) return rows.length
+
+  output.write(HIDE_CURSOR)
+  for (let index = 0; index < rowCount; index += 1) {
+    output.write(`${moveVertical(1)}\r${ERASE_LINE}`)
+    if (index < rows.length) output.write(rows[index]!)
+  }
+  output.write(`${moveVertical(-rowCount)}${moveToColumn(cursorColumn)}${SHOW_CURSOR}`)
+  return rows.length
+}
+
+function styledPaletteRows(
+  layout: AvtiSlashPaletteLayout,
+  theme: AvtiTheme,
+  output: NodeJS.WriteStream,
+): string[] {
+  const rows = layout.rows.map(row => {
+    const marker = styleAvtiTone(row.selected ? '›' : ' ', row.selected ? 'accentBright' : 'subtle', theme, output)
+    const command = styleAvtiTone(row.command, row.selected ? 'accentBright' : 'text', theme, output)
+    const description = row.description === '' ? '' : `  ${styleAvtiTone(row.description, 'muted', theme, output)}`
+    return `  ${marker} ${command}${description}`
+  })
+  if (layout.footer !== '') rows.push(styleAvtiTone(layout.footer, 'subtle', theme, output))
+  return rows
+}
+
+function formatPromptFailure(cause: unknown): string {
+  return cause instanceof Error ? cause.stack ?? cause.message : String(cause)
+}
+
 export async function questionWithAvtiSlashPalette(
   options: AvtiSlashPaletteOptions,
   prompt: string,
 ): Promise<string> {
-  return await options.readline.question(prompt)
+  const input = options.input ?? process.stdin
+  const output = options.output ?? process.stdout
+  let scheduled = false
+  let active = true
+  let keypressAttached = false
+  let paintedRows = 0
+  let state: AvtiSlashPaletteState = { dismissed: false, selectedIndex: 0 }
+  let renderedLine = ''
+
+  const clearPalette = (): void => {
+    if (paintedRows === 0 || output.isTTY !== true) return
+    paintedRows = paintPaletteRows(output, [], paintedRows, currentCursorColumn(options.readline))
+  }
+
+  const renderPalette = (): void => {
+    if (output.isTTY !== true || input.isTTY !== true) return
+    const line = currentReadlineLine(options.readline)
+    const matches = filterAvtiCommandSuggestions(line, options.getSuggestions())
+    state = nextAvtiSlashPaletteState(state, line, undefined, matches.length)
+    const columns = output.columns ?? 80
+    const layout = layoutAvtiSlashPalette(line, options.getSuggestions(), state, columns)
+    const theme = options.getTheme?.() ?? loadAvtiTheme()
+    const rows = styledPaletteRows(layout, theme, output)
+    paintedRows = paintPaletteRows(output, rows, paintedRows, currentCursorColumn(options.readline))
+  }
+
+  const scheduleRender = (): void => {
+    if (!active || scheduled) return
+    scheduled = true
+    setImmediate(() => {
+      scheduled = false
+      if (!active) return
+      try {
+        const line = currentReadlineLine(options.readline)
+        if (line !== renderedLine && !isSlashPrefix(line)) state = { dismissed: false, selectedIndex: 0 }
+        renderedLine = line
+        renderPalette()
+      } catch (cause) {
+        active = false
+        try { clearPalette() } catch { /* best-effort cleanup */ }
+        process.stderr.write(`avti: command shelf failed: ${formatPromptFailure(cause)}\n`)
+      }
+    })
+  }
+
+  const suppressReadlineKey = (key: MutableKeypress): void => {
+    key.name = 'avti-palette'
+    key.sequence = ''
+    key.ctrl = false
+    key.meta = false
+  }
+
+  const onKeypress = (_character: string | undefined, key?: MutableKeypress): void => {
+    if (!active) return
+    const keyName = key?.name
+    const line = currentReadlineLine(options.readline)
+    const matches = filterAvtiCommandSuggestions(line, options.getSuggestions())
+
+    if (keyName === 'escape' && isSlashPrefix(line)) {
+      state = nextAvtiSlashPaletteState(state, line, keyName, matches.length)
+      if (key !== undefined) suppressReadlineKey(key)
+      try { clearPalette() } catch { /* logical dismissal is enough */ }
+      return
+    }
+
+    if (!state.dismissed && matches.length > 0 && (keyName === 'up' || keyName === 'down')) {
+      state = nextAvtiSlashPaletteState(state, line, keyName, matches.length)
+      if (key !== undefined) suppressReadlineKey(key)
+      scheduleRender()
+      return
+    }
+
+    if (!state.dismissed && matches.length > 0 && (keyName === 'tab' || keyName === 'return' || keyName === 'enter')) {
+      const selected = matches[Math.min(state.selectedIndex, matches.length - 1)]!
+      const candidate = line.trimStart()
+      const exact = candidate === selected.command
+      const completeSelected = keyName === 'tab' || !exact
+      if (completeSelected) {
+        const accepted = selected.hint === undefined ? selected.command : `${selected.command} `
+        replaceReadlineLine(options.readline, accepted)
+        if (key !== undefined) suppressReadlineKey(key)
+        state = { dismissed: true, selectedIndex: 0 }
+        try { clearPalette() } catch { /* the next prompt render can recover */ }
+        return
+      }
+    }
+
+    if (keyName === 'return' || keyName === 'enter') {
+      try { clearPalette() } catch { /* readline must still be allowed to submit */ }
+      return
+    }
+
+    scheduleRender()
+  }
+
+  if (input.isTTY === true && output.isTTY === true) {
+    try {
+      input.prependListener('keypress', onKeypress)
+      keypressAttached = true
+    } catch (cause) {
+      process.stderr.write(`avti: command shelf disabled: ${formatPromptFailure(cause)}\n`)
+    }
+  }
+
+  try {
+    return await options.readline.question(prompt)
+  } catch (cause) {
+    process.stderr.write(`avti: interactive prompt failed: ${formatPromptFailure(cause)}\n`)
+    throw cause
+  } finally {
+    active = false
+    if (keypressAttached) input.off('keypress', onKeypress)
+    try { clearPalette() } catch { /* never hide the prompt result/error */ }
+    if (output.isTTY === true) output.write(SHOW_CURSOR)
+  }
 }
