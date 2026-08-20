@@ -38,6 +38,7 @@ import {
   createAvtiActivity,
   formatAvtiFailure,
   formatAvtiSuccess,
+  formatAvtiWelcome,
   type AvtiActivity,
 } from './avti-terminal-style.ts'
 import {
@@ -460,7 +461,12 @@ export async function runAvtiInteractive(options: AvtiInteractiveOptions = {}): 
       theme,
     }
     const active = currentAvtiSelection(controls)
-    process.stdout.write(`${process.cwd()} · ${active.model}${options.resumeSessionId === undefined ? '' : ' · resumed'}\n\n`)
+    process.stdout.write(formatAvtiWelcome(theme.current, {
+      project: process.cwd(),
+      provider: active.provider,
+      model: active.model,
+      resumed: options.resumeSessionId !== undefined,
+    }, process.stdout))
 
     while (true) {
       let task: string

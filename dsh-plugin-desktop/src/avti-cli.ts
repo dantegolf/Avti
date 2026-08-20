@@ -250,12 +250,10 @@ export async function runAvtiCli(
     return
   }
   if (invocation.mode === 'interactive') {
-    await renderAvtiIntro({ output: process.stdout, environment })
     await runAvtiInteractive({ providerPatchPath })
     return
   }
   if (invocation.mode === 'resume') {
-    await renderAvtiIntro({ output: process.stdout, environment })
     await runAvtiInteractive({ resumeSessionId: invocation.sessionId, providerPatchPath })
     return
   }

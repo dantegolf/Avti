@@ -9,6 +9,7 @@ export const AVTI_INTRO_FRAMES = ['A', 'AV', 'AVT', 'AVTI'] as const
 
 export interface AvtiTerminalOutput {
   readonly isTTY?: boolean
+  readonly columns?: number
   write(chunk: string): boolean
 }
 
@@ -100,6 +101,7 @@ export function formatAvtiAssistantLabel(
   return `${mark} ${label}`
 }
 
+
 /** Create one transient activity row with Avti's orbit/pulse motion language. */
 export function createAvtiActivity(options: AvtiActivityOptions = {}): AvtiActivity {
   const output = options.output ?? process.stdout
@@ -182,18 +184,74 @@ export function createAvtiActivity(options: AvtiActivityOptions = {}): AvtiActiv
   }
 }
 
+
+function oneLine(value: string): string {
+  return value.replace(/[\r\n\t]+/gu, ' ').replace(/\s{2,}/gu, ' ').trim()
+}
+
+function fitText(value: string, width: number): string {
+  if (width <= 0) return ''
+  const normalized = oneLine(value)
+  if (normalized.length <= width) return normalized
+  if (width === 1) return '…'
+  return `${normalized.slice(0, width - 1)}…`
+}
+
+function padded(value: string, width: number): string {
+  const fitted = fitText(value, width)
+  return fitted.padEnd(width)
+}
+
+/**
+ * A compact status card for interactive sessions. The hierarchy mirrors the useful
+ * parts of modern coding-agent CLIs: product/version-sized identity, obvious current
+ * project/model context, and one quiet discoverability hint. It is width-safe.
+ */
 export function formatAvtiWelcome(
   theme: AvtiTheme,
-  context: { readonly project: string; readonly provider: string; readonly model: string },
-  output: { readonly isTTY?: boolean } = process.stdout,
+  context: {
+    readonly project: string
+    readonly provider: string
+    readonly model: string
+    readonly resumed?: boolean
+  },
+  output: { readonly isTTY?: boolean; readonly columns?: number } = process.stdout,
   environment: NodeJS.ProcessEnv = process.env,
 ): string {
-  const brand = styleAvtiTone('AVTI', 'accentBright', theme, output, environment)
-  const orbit = styleAvtiTone('◇', 'accent', theme, output, environment)
-  const project = styleAvtiTone(context.project, 'text', theme, output, environment)
-  const model = styleAvtiTone(`${context.provider}/${context.model}`, 'muted', theme, output, environment)
-  const hint = styleAvtiTone('/ commands · ↑↓ navigate · esc closes menus', 'subtle', theme, output, environment)
-  return `${orbit} ${brand}\n  ${project}  ${styleAvtiTone('·', 'subtle', theme, output, environment)}  ${model}\n  ${hint}\n\n`
+  const columns = Math.max(1, output.columns ?? 80)
+  const usable = Math.max(1, columns - 1)
+  const model = `${context.provider}/${context.model}`
+  const status = context.resumed === true ? 'Session resumed' : 'Ready'
+
+  if (usable < 36) {
+    const line1 = fitText(`AVTI · ${status}`, usable)
+    const line2 = fitText(context.project, usable)
+    const line3 = fitText(model, usable)
+    const hint = fitText('/ commands · esc closes menus', usable)
+    return `${styleAvtiTone(line1, 'accentBright', theme, output, environment)}\n${styleAvtiTone(line2, 'text', theme, output, environment)}\n${styleAvtiTone(line3, 'muted', theme, output, environment)}\n${styleAvtiTone(hint, 'subtle', theme, output, environment)}\n\n`
+  }
+
+  const width = Math.min(72, usable)
+  const inner = width - 4
+  const topPrefixPlain = '╭─ AVTI '
+  const topFill = '─'.repeat(Math.max(0, width - topPrefixPlain.length - 1))
+  const top = `${styleAvtiTone('╭─', 'subtle', theme, output, environment)} ${styleAvtiTone('AVTI', 'accentBright', theme, output, environment)} ${styleAvtiTone(`${topFill}╮`, 'subtle', theme, output, environment)}`
+  const bottom = styleAvtiTone(`╰${'─'.repeat(width - 2)}╯`, 'subtle', theme, output, environment)
+  const body = (value: string, tone: 'text' | 'muted' | 'subtle' | 'accent'): string => {
+    const content = padded(value, inner)
+    return `${styleAvtiTone('│', 'subtle', theme, output, environment)} ${styleAvtiTone(content, tone, theme, output, environment)} ${styleAvtiTone('│', 'subtle', theme, output, environment)}`
+  }
+
+  return [
+    top,
+    body(status, 'text'),
+    body(`project  ${context.project}`, 'muted'),
+    body(`model    ${model}`, 'muted'),
+    body('/ commands · esc closes menus', 'subtle'),
+    bottom,
+    '',
+    '',
+  ].join('\n')
 }
 
 export async function renderAvtiIntro(options: AvtiMotionOptions = {}): Promise<void> {
