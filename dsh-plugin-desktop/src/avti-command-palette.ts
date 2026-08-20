@@ -4,6 +4,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { Interface } from 'node:readline/promises'
 import {
+  loadAvtiTheme,
   styleAvtiSelection,
   styleAvtiTone,
   type AvtiTheme,
@@ -16,7 +17,6 @@ export interface AvtiCommandSuggestion {
   readonly source: 'avti' | 'harness'
 }
 
-/** Avti-owned commands. Harness/plugin commands are merged at runtime. */
 export const AVTI_COMMAND_SUGGESTIONS: readonly AvtiCommandSuggestion[] = [
   { command: '/help', description: 'Show terminal commands', source: 'avti' },
   { command: '/status', description: 'Show project, model and session', source: 'avti' },
@@ -29,7 +29,6 @@ export const AVTI_COMMAND_SUGGESTIONS: readonly AvtiCommandSuggestion[] = [
 
 const AVTI_SLASH_PALETTE_LIMIT = 6
 
-/** Merge Avti commands with whatever the native Harness command registry exposes. */
 export function listAvtiCommandSuggestions(ctx: Context, agent: Agent): AvtiCommandSuggestion[] {
   const merged = new Map<string, AvtiCommandSuggestion>()
   for (const suggestion of AVTI_COMMAND_SUGGESTIONS) merged.set(suggestion.command, suggestion)
@@ -53,7 +52,6 @@ function isSlashPrefix(line: string): boolean {
   return candidate.startsWith('/') && !/\s/u.test(candidate)
 }
 
-/** Only show the shelf while the first token is a slash-command prefix. */
 export function filterAvtiCommandSuggestions(
   line: string,
   suggestions: readonly AvtiCommandSuggestion[],
@@ -67,7 +65,6 @@ export function filterAvtiCommandSuggestions(
     .slice(0, limit)
 }
 
-/** Native readline completion remains available when the shelf is inactive. */
 export function createAvtiSlashCompleter(
   getSuggestions: () => readonly AvtiCommandSuggestion[],
 ): (line: string) => [string[], string] {
@@ -120,7 +117,7 @@ interface MutableKeypress {
 export interface AvtiSlashPaletteOptions {
   readonly readline: Interface
   readonly getSuggestions: () => readonly AvtiCommandSuggestion[]
-  readonly getTheme: () => AvtiTheme
+  readonly getTheme?: () => AvtiTheme
   readonly input?: NodeJS.ReadStream
   readonly output?: NodeJS.WriteStream
 }
@@ -141,10 +138,6 @@ function replaceReadlineLine(readline: Interface, next: string): void {
   writable.write(next)
 }
 
-function shelfMatches(options: AvtiSlashPaletteOptions): AvtiCommandSuggestion[] {
-  return filterAvtiCommandSuggestions(currentReadlineLine(options.readline), options.getSuggestions())
-}
-
 function renderPalette(
   options: AvtiSlashPaletteOptions,
   state: AvtiSlashPaletteState,
@@ -159,7 +152,7 @@ function renderPalette(
   clearPalette(output)
   if (nextState.dismissed || matches.length === 0) return nextState
 
-  const theme = options.getTheme()
+  const theme = options.getTheme?.() ?? loadAvtiTheme()
   const commandWidth = Math.max(...matches.map(suggestion => suggestion.command.length + (suggestion.hint?.length ?? 0) + 1))
   const header = `  ${styleAvtiTone('╭─', 'subtle', theme, output)} ${styleAvtiTone('commands', 'accent', theme, output)}`
   const rows = matches.map((suggestion, index) => {
@@ -180,11 +173,6 @@ function formatPromptFailure(cause: unknown): string {
   return cause instanceof Error ? cause.stack ?? cause.message : String(cause)
 }
 
-/**
- * Readline still owns editing/history, while Avti owns a disposable command shelf.
- * Arrow keys move the shelf selection; Enter accepts a partial command before the
- * next Enter submits it; Escape closes the shelf for the current slash token.
- */
 export async function questionWithAvtiSlashPalette(
   options: AvtiSlashPaletteOptions,
   prompt: string,
@@ -210,7 +198,7 @@ export async function questionWithAvtiSlashPalette(
         state = renderPalette(options, state)
       } catch (cause) {
         active = false
-        process.stderr.write(`avti: slash palette failed: ${formatPromptFailure(cause)}\n`)
+        process.stderr.write(`avti: command shelf failed: ${formatPromptFailure(cause)}\n`)
       }
     })
   }
