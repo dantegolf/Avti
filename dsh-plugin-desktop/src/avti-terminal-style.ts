@@ -25,6 +25,7 @@ export interface AvtiActivityOptions {
   readonly frames?: readonly string[]
   readonly intervalMs?: number
   readonly theme?: AvtiTheme
+  readonly announceTurn?: boolean
   readonly setInterval?: (callback: () => void, milliseconds: number) => ReturnType<typeof setInterval>
   readonly clearInterval?: (handle: ReturnType<typeof setInterval>) => void
 }
@@ -89,10 +90,21 @@ function styledCompletion(symbol: string, label: string, tone: 'success' | 'erro
   return `  ${styleAvtiTone(symbol, tone, theme, output, environment)} ${styleAvtiTone(label, 'muted', theme, output, environment)}`
 }
 
+export function formatAvtiAssistantLabel(
+  theme: AvtiTheme = activeTheme(process.env),
+  output: { readonly isTTY?: boolean } = process.stdout,
+  environment: NodeJS.ProcessEnv = process.env,
+): string {
+  const mark = styleAvtiTone('◆', 'accent', theme, output, environment)
+  const label = styleAvtiTone('Avti', 'accentBright', theme, output, environment)
+  return `${mark} ${label}`
+}
+
 /** Create one transient activity row with Avti's orbit/pulse motion language. */
 export function createAvtiActivity(options: AvtiActivityOptions = {}): AvtiActivity {
   const output = options.output ?? process.stdout
   const environment = options.environment ?? process.env
+  const theme = options.theme ?? activeTheme(environment)
   let frames = options.frames?.length ? options.frames : AVTI_ORBIT_FRAMES
   const intervalMs = options.intervalMs ?? 90
   const schedule = options.setInterval ?? ((callback, milliseconds) => setInterval(callback, milliseconds))
@@ -103,12 +115,19 @@ export function createAvtiActivity(options: AvtiActivityOptions = {}): AvtiActiv
   let frameIndex = 0
   let timer: ReturnType<typeof setInterval> | undefined
   let active = false
+  let announced = false
+
+  const announce = (): void => {
+    if (announced || options.announceTurn === false || output.isTTY !== true) return
+    announced = true
+    output.write(`${formatAvtiAssistantLabel(theme, output, environment)}\n`)
+  }
 
   const writeFrame = (): void => {
     if (!active) return
     const frame = frames[frameIndex % frames.length]!
     frameIndex += 1
-    if (motion) output.write(`${ERASE_LINE}${CURSOR_COLUMN_ZERO}${styledActivity(frame, label, options)}`)
+    if (motion) output.write(`${ERASE_LINE}${CURSOR_COLUMN_ZERO}${styledActivity(frame, label, { ...options, theme })}`)
   }
 
   const finishTransient = (): void => {
@@ -124,11 +143,12 @@ export function createAvtiActivity(options: AvtiActivityOptions = {}): AvtiActiv
   return {
     start(nextLabel: string) {
       if (active) return
+      announce()
       label = nextLabel
       frameIndex = 0
       active = true
       if (!motion) {
-        output.write(`${styledActivity('·', label, options)}\n`)
+        output.write(`${styledActivity('·', label, { ...options, theme })}\n`)
         return
       }
       writeFrame()
@@ -139,7 +159,7 @@ export function createAvtiActivity(options: AvtiActivityOptions = {}): AvtiActiv
       label = nextLabel
       if (!active) return
       if (motion) writeFrame()
-      else if (changed) output.write(`${styledActivity('·', label, options)}\n`)
+      else if (changed) output.write(`${styledActivity('·', label, { ...options, theme })}\n`)
     },
     setFrames(nextFrames: readonly string[]) {
       if (nextFrames.length === 0) return
@@ -149,27 +169,17 @@ export function createAvtiActivity(options: AvtiActivityOptions = {}): AvtiActiv
     succeed(nextLabel = 'Done') {
       if (!active) return
       finishTransient()
-      output.write(`${styledCompletion('✓', nextLabel, 'success', options)}\n`)
+      output.write(`${styledCompletion('✓', nextLabel, 'success', { ...options, theme })}\n`)
     },
     fail(nextLabel: string) {
       if (!active) return
       finishTransient()
-      output.write(`${styledCompletion('×', nextLabel, 'error', options)}\n`)
+      output.write(`${styledCompletion('×', nextLabel, 'error', { ...options, theme })}\n`)
     },
     stop() {
       finishTransient()
     },
   }
-}
-
-export function formatAvtiAssistantLabel(
-  theme: AvtiTheme = activeTheme(process.env),
-  output: { readonly isTTY?: boolean } = process.stdout,
-  environment: NodeJS.ProcessEnv = process.env,
-): string {
-  const mark = styleAvtiTone('◆', 'accent', theme, output, environment)
-  const label = styleAvtiTone('Avti', 'accentBright', theme, output, environment)
-  return `${mark} ${label}`
 }
 
 export function formatAvtiWelcome(
