@@ -1,7 +1,7 @@
 /** Thin Avti-branded entrypoint over the existing DeepSeek Harness CLI runtime. */
 
 import { spawn } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readFileSync, realpathSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -268,9 +268,18 @@ export async function runAvtiCli(
   await load(DSH_ENTRY_URL, argv, environment)
 }
 
+/** Resolve macOS aliases/symlinks (for example /var -> /private/var) before comparing. */
+export function sameAvtiExecutionPath(modulePath: string, entryPath: string): boolean {
+  try {
+    return realpathSync(modulePath) === realpathSync(entryPath)
+  } catch {
+    return modulePath === entryPath
+  }
+}
+
 function isDirectExecution(): boolean {
   const entry = process.argv[1]
-  return entry !== undefined && fileURLToPath(import.meta.url) === entry
+  return entry !== undefined && sameAvtiExecutionPath(fileURLToPath(import.meta.url), entry)
 }
 
 if (isDirectExecution()) {
