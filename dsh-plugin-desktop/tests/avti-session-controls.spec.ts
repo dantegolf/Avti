@@ -77,7 +77,7 @@ describe('Avti interactive session controls', () => {
     }
   })
 
-  it('lists themes without opening an agent turn', async () => {
+  it('lists Avti themes without opening an agent turn', async () => {
     const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
     const context = {
       ctx: { get: vi.fn(() => undefined) } as unknown as Context,
@@ -90,7 +90,7 @@ describe('Avti interactive session controls', () => {
 
     try {
       await expect(handleAvtiSessionControl('/theme', context)).resolves.toBe('handled')
-      expect(stdout).toHaveBeenCalledWith(expect.stringContaining('Claude Warm'))
+      expect(stdout).toHaveBeenCalledWith(expect.stringContaining('Avti Orbit'))
       expect(stdout).toHaveBeenCalledWith(expect.stringContaining('midnight'))
     } finally {
       stdout.mockRestore()
