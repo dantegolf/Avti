@@ -166,8 +166,13 @@ jobs:
           test "$actual_version" = "0.1.4"
           test -f "$bundle/app/node_modules/@earendil-works/pi-ai/dist/providers/data/.manifest.json"
 
+          # Run the extracted artifact from an isolated user project. Running it
+          # from the Avti source checkout would intentionally load that project's
+          # local Harness layers and would no longer be a portable-artifact smoke.
+          project="$unpack/project"
+          mkdir -p "$project"
           set +e
-          models_output="$(AVTI_CLI_HOME="$unpack/home" AVTI_NO_MOTION=1 NO_COLOR=1 "$bundle/avti" models antigravity 2>&1)"
+          models_output="$(cd "$project" && AVTI_CLI_HOME="$unpack/home" AVTI_NO_MOTION=1 NO_COLOR=1 "$bundle/avti" models antigravity 2>&1)"
           models_status=$?
           set -e
           printf '%s\n' "$models_output"
