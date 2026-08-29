@@ -1,79 +1,85 @@
 <p align="center">
-  <img src="assets/avti-logo.svg" width="120" alt="Логотип Avti">
+  <img src="assets/avti-logo.svg" width="120" alt="Avti">
 </p>
 
 <h1 align="center">Avti</h1>
 
 <p align="center">
-  Локальное AI-пространство для работы с проектами.
+  Десктопное приложение для работы с AI-агентом прямо в локальных проектах.
 </p>
 
 <p align="center">
   <a href="https://github.com/dantegolf/Avti/releases/latest"><strong>Скачать для Windows</strong></a>
   ·
-  <a href="#установка-из-powershell">Установить из PowerShell</a>
+  <a href="#установка-через-powershell">PowerShell</a>
 </p>
 
 <p align="center"><strong>Русский</strong> · <a href="README.en.md">English</a> · <a href="README.zh.md">中文</a></p>
 
-<p align="center"><code>ai-agent</code> · <code>desktop</code> · <code>local-projects</code> · <code>electron</code> · <code>plugins</code> · <code>windows</code></p>
+## Что это
+
+Avti — приложение, в котором можно открыть папку проекта, подключить AI-модель и работать с кодом в одном окне.
+
+Агент видит контекст проекта, может использовать инструменты и терминал, а сессии остаются привязаны к конкретному workspace. Никакой отдельной веб-панели для повседневной работы не нужно.
+
+Если рядом запущен [ClaudeGravity](https://github.com/dantegolf/ClaudeGravity-), Avti автоматически показывает его как локального провайдера вместе с доступными моделями.
 
 ## Быстрый старт
 
-1. Установите и откройте Avti.
-2. Выберите папку локального проекта.
-3. Подключите AI-провайдера и выберите модель.
-4. Создайте новую сессию и начинайте работать.
+1. [Скачайте последний релиз](https://github.com/dantegolf/Avti/releases/latest) и установите Avti.
+2. Откройте папку проекта.
+3. Добавьте AI-провайдера и выберите модель.
+4. Создайте сессию и начинайте работать.
 
-Если рядом запущен [ClaudeGravity](https://github.com/dantegolf/ClaudeGravity-),
-его локальный провайдер и модели доступны в списке как `ClaudeGravity`.
+Для обычной установки Node.js и Yarn не нужны.
 
-Пользователю Avti не нужны Node.js, Yarn или ручная сборка проекта — они требуются только разработчикам.
+## Возможности
+
+- работа с локальными папками и проектами;
+- отдельные AI-сессии для разных задач;
+- подключение разных провайдеров и моделей;
+- встроенные tools, commands и attachments;
+- терминал рядом с диалогом;
+- profiles для разных окружений и конфигураций;
+- установка и управление community-плагинами через Plugin Market;
+- локальные логи и экспорт диагностики, если что-то пошло не так.
 
 ## Установка на Windows
 
-### Обычная установка
+### Через установщик
 
-Скачайте последний `Avti-*-x64-Setup.exe` на странице [Releases](https://github.com/dantegolf/Avti/releases/latest) и запустите его.
+Скачайте файл `Avti-*-x64-Setup.exe` из [последнего релиза](https://github.com/dantegolf/Avti/releases/latest) и запустите его.
 
-Установщик создаёт ярлык Avti и устанавливает приложение для текущего пользователя. Windows-сборки проекта сейчас не подписаны Authenticode, поэтому до подключения code signing SmartScreen может показать предупреждение.
+Сборки пока не подписаны Authenticode, поэтому Windows SmartScreen может показать предупреждение при первом запуске.
 
-### Установка из PowerShell
+### Установка через PowerShell
 
-Для установки последнего релиза одной командой:
+Последний релиз можно установить одной командой:
 
 ```powershell
 irm https://raw.githubusercontent.com/dantegolf/Avti/main/install.ps1 | iex
 ```
 
-Терминальный установщик:
+Скрипт сам скачает актуальный Windows x64 installer, сверит SHA-256 и запустит установку.
 
-- определяет Windows x64;
-- получает последний GitHub Release;
-- скачивает готовый Avti Setup;
-- проверяет опубликованный SHA-256;
-- устанавливает Avti в тихом режиме;
-- запускает приложение, если оно найдено в стандартной папке установки.
+Если нужна диагностика:
 
-Для диагностики можно скачать `install.ps1` и запустить его с `-Verbose`. Чтобы увидеть обычный интерфейс NSIS-установщика, используйте `-Interactive`.
+```powershell
+./install.ps1 -Verbose
+```
 
-## Что умеет Avti
+Чтобы открыть обычный интерфейс установщика:
 
-- **Работа с локальными проектами** — workspaces, выбор папок, drag-and-drop и нативный directory picker на Windows.
-- **AI-агент и проектный контекст** — сессии, attachments, commands, tools, code runtime, permissions и sandbox-возможности.
-- **Подключаемые модели** — конфигурация AI-провайдеров и моделей через интерфейс приложения.
-- **Десктопный интерфейс** — sidebar, conversation и details surface в нативном окне с системным tray.
-- **Локальный терминал** — интегрированные terminal/shell-сервисы для работы рядом с агентом.
-- **Profiles** — отдельные конфигурации окружения, плагинов и runtime.
-- **Plugin Market** — встроенный каталог community-плагинов с установкой, удалением и управлением.
-- **Диагностика** — локальные логи, boot health, crash evidence, экспорт диагностики и recovery-потоки.
+```powershell
+./install.ps1 -Interactive
+```
 
-## Для разработчиков
+## Разработка
 
-Требования:
+Нужны:
 
-- Node.js `^22.19.0` или `>=24.0.0`
-- Yarn `4.18.0`
+- Node.js `^22.19.0` или `>=24.0.0`;
+- Yarn `4.18.0`.
 
 ```bash
 git clone https://github.com/dantegolf/Avti.git
@@ -83,7 +89,7 @@ yarn install
 yarn dev
 ```
 
-Основные команды:
+Полезные команды:
 
 ```bash
 yarn build
@@ -95,22 +101,22 @@ yarn dist:win-portable
 yarn dist:mac
 ```
 
-Windows release pipeline находится в `.github/workflows/release-windows.yml`: tag вида `v2.0.1`, совпадающий с версией desktop package, собирает NSIS installer, создаёт `SHA256SUMS.txt` и публикует оба файла в GitHub Release.
+Релизы для Windows собираются через `.github/workflows/release-windows.yml`. Тег версии запускает сборку NSIS installer и публикацию `SHA256SUMS.txt` в GitHub Releases.
 
-## Структура репозитория
+## Что лежит в репозитории
 
-- `dsh-plugin-desktop/` — Electron-оболочка Avti и desktop-сервисы
-- `dsh-community-market/` — каталог плагинов, marketplace UI и install/uninstall flow
-- `dsh-community-fabric/` — совместимость плагинов и contracts
-- `patches/` — compatibility-патчи для зафиксированных runtime-зависимостей
-- `install.ps1` — пользовательский Windows bootstrap installer
+- `dsh-plugin-desktop/` — Electron-приложение и desktop-сервисы;
+- `dsh-community-market/` — Plugin Market;
+- `dsh-community-fabric/` — contracts и совместимость плагинов;
+- `patches/` — патчи для runtime-зависимостей;
+- `install.ps1` — PowerShell-установщик для Windows.
 
-## Open source и лицензии
+## Ограничения
 
-Avti использует runtime-пакеты DeepSeek Harness и другие open-source компоненты. Эти зависимости остаются явно указаны в лицензиях и third-party notices; пользовательский установочный процесс просто не требует вручную работать с их пакетными менеджерами и build-командами.
+Сейчас у Avti нет собственного подписанного канала автообновлений. Windows installer также пока публикуется без Authenticode-подписи.
 
-Лицензия проекта: [`LICENSE`](LICENSE). Сторонние компоненты desktop-пакета: [`dsh-plugin-desktop/THIRD_PARTY_NOTICES.md`](dsh-plugin-desktop/THIRD_PARTY_NOTICES.md).
+## Лицензия
 
-## Текущие ограничения
+Avti распространяется по лицензии [MIT](LICENSE).
 
-Avti пока не имеет собственного подписанного automatic-update канала. Updater исходного DSH Desktop отключён, а Windows installer пока публикуется без Authenticode-подписи. Следующий production-шаг для Windows — добавить code signing в release pipeline.
+Проект использует DeepSeek Harness и другие open-source зависимости. Информация о сторонних компонентах desktop-пакета находится в [`dsh-plugin-desktop/THIRD_PARTY_NOTICES.md`](dsh-plugin-desktop/THIRD_PARTY_NOTICES.md).
